@@ -1,0 +1,3 @@
+In the Images folder, we will store several different subdirectories of images to use for learning and verification.
+In google-images, we have a folder for each character that we want to identify. In this folder are images downloaded using Google Image Scraper on Github
+From here, a larger datqset is generated in Images/augmented-images. This will include the original images as well as images formed by rotating the images +/- ~5 degrees, flipping around the y-axis, shrinking in size (placing over a background to fit original resolution if necessary), applying a LPF to remove detail, shrinking and then moving to different corners fo the full image, etc.
