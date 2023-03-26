@@ -42,13 +42,9 @@ class GoogleImageScraper():
         for i in range(1):
             try:
                 #try going to www.google.com
-                # fireFoxOptions = webdriver.FirefoxOptions()
-                # if(headless):
-                #     fireFoxOptions.set_headless()
-                # driver = webdriver.Firefox(firefox_options=fireFoxOptions)
                 firefox_options = Options()
-                firefox_options.add_argument("--headless")
-
+                if headless:
+                    firefox_options.add_argument("--headless")
                 driver = webdriver.Firefox(options=firefox_options)
                 driver.set_window_size(1400,1050)
                 driver.get("https://www.google.com")

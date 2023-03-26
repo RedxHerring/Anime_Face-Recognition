@@ -11,6 +11,9 @@ import selenium.webdriver.support.ui as UI
 import requests
 import cv2
 import os
+import io
+import wget
+
 # Function to return boolean True if image is black&white, and False otherwise
 def is_black_n_white(img):
 
@@ -53,8 +56,14 @@ def is_black_n_white(img):
 
     cv2.destroyAllWindows()
 
+def char_is_num(x):
+    if(x >= '0' and x <= '9'):
+        return True
+    else:
+        return False
 
-def list_anime_characters(anime_name,image_path='',keep_filenames=False):
+def list_anime_characters(anime_name,images_path='',keep_filenames=False):
+    os.makedirs(images_path,exist_ok=True)
     firefox_options = Options()
     firefox_options.add_argument("--headless")
     driver = webdriver.Firefox(options=firefox_options)
@@ -83,55 +92,31 @@ def list_anime_characters(anime_name,image_path='',keep_filenames=False):
         character_name = elem.text.partition("\n")[0]
         if ',' in character_name:
             lastfirst = character_name.partition(",")
-            character_name = lastfirst[2] + lastfirst[0]
+            character_name = lastfirst[2] + "_" + lastfirst[0]
             if character_name[0] == " ": # extra space is generated
                 character_name = character_name[1:]
+        character_name = character_name.replace(" ","_")
+        while character_name in character_names: # Character name already present
+            if char_is_num(character_name[-1]):
+                character_name = character_name[0:-1] + str(int(character_name[-1])+1)
+            else:
+                character_name = character_name + '_1'
         character_names.append(character_name)
         # Now we want to extract the image that comes with the character, as for minor characters we won't find one elsewhere.
         link_elem = elem.find_element(By.CLASS_NAME,'spaceit_pad').find_element(By.CSS_SELECTOR,'a')
         character_links.append(link_elem.get_attribute('href'))
-    for chidx in range(len(character_names)):
+    for chidx in range(len(character_names)): # Loop through all characters in the anime
         character_name = character_names[chidx]
         link = character_links[chidx]
+        image_path = os.path.join(images_path,character_name)
+        os.makedirs(image_path,exist_ok=True)
         driver.get(link)
-        wait = UI.WebDriverWait(driver, 3000)
+        time.sleep(5)
         elem = driver.find_element(By.CLASS_NAME,'portrait-225x350.lazyloaded') # find main character image on the page
         image_url = elem.get_attribute('src')
-        try:
-            print("[INFO] Image url:%s"%(image_url))
-            image = requests.get(image_url,timeout=5)
-            if image.status_code == 200:
-                with Image.open(io.BytesIO(image.content)) as image_from_web:
-                    try:
-                        if (keep_filenames):
-                            #extact filename without extension from URL
-                            o = urlparse(image_url)
-                            image_url = o.scheme + "://" + o.netloc + o.path
-                            name = os.path.splitext(os.path.basename(image_url))[0]
-                            #join filename and extension
-                            filename = "%s.%s"%(name,image_from_web.format.lower())
-                        else:
-                            filename = "%s%s.%s"%(character_name,'000',image_from_web.format.lower())
-
-                        full_image_path = os.path.join(image_path, filename)
-                        print(
-                            f"[INFO] {character_name} \t {indx} \t Image saved at: {image_path}")
-                        image_from_web.save(image_path)
-                    except OSError:
-                        rgb_im = image_from_web.convert('RGB')
-                        rgb_im.save(image_path)
-                    image_resolution = image_from_web.size
-                    image_from_web.close()
-        except Exception as e:
-            print("[ERROR] Download failed: ",e)
-            pass
-
-
-
-
-
-
+        # Download with wget
+        wget.download(image_url,out=image_path)
 
 
 if __name__ == '__main__':
-    list_anime_characters('Monster')
+    list_anime_characters('Monster','Images/original-images')
