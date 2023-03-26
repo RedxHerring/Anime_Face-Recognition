@@ -6,15 +6,12 @@ Created on Sat Jul 18 13:01:02 2020
 """
 #import selenium drivers
 from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
+# make sure geckodriver installed in default locaiton for OS. For linux installation the package manager should do its job here.
+from selenium.webdriver.firefox.options import Options 
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import NoSuchElementException
 
 #import helper libraries
 import time
-import urllib.request
 from urllib.parse import urlparse
 import os
 import requests
@@ -45,10 +42,10 @@ class GoogleImageScraper():
         for i in range(1):
             try:
                 #try going to www.google.com
-                options = Options()
-                if(headless):
-                    options.add_argument('--headless')
-                driver = webdriver.Chrome(webdriver_path, chrome_options=options)
+                firefox_options = Options()
+                if headless:
+                    firefox_options.add_argument("--headless")
+                driver = webdriver.Firefox(options=firefox_options)
                 driver.set_window_size(1400,1050)
                 driver.get("https://www.google.com")
             except Exception as e:
