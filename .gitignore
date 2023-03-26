@@ -6,3 +6,6 @@
 *.fatbin
 *.mp4
 *.mkv
+test.*
+*.log
+__*
