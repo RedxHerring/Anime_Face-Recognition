@@ -12,6 +12,7 @@ import requests
 import cv2
 import os
 import io
+import pandas as pd
 import wget
 
 # Function to return boolean True if image is black&white, and False otherwise
@@ -88,6 +89,7 @@ def list_anime_characters(anime_name,images_path='',keep_filenames=False):
     elem_list = driver.find_elements(By.CLASS_NAME,'js-anime-character-table')
     character_links = []
     character_names = []
+    # Loop though list to get character's primary name and link to character's page
     for elem in elem_list:
         character_name = elem.text.partition("\n")[0]
         if ',' in character_name:
@@ -102,9 +104,12 @@ def list_anime_characters(anime_name,images_path='',keep_filenames=False):
             else:
                 character_name = character_name + '_1'
         character_names.append(character_name)
-        # Now we want to extract the image that comes with the character, as for minor characters we won't find one elsewhere.
+        # Use class and css to find character page link.
         link_elem = elem.find_element(By.CLASS_NAME,'spaceit_pad').find_element(By.CSS_SELECTOR,'a')
         character_links.append(link_elem.get_attribute('href'))
+    
+    # Create table with character name and links, as well as any alternative names.
+
     for chidx in range(len(character_names)): # Loop through all characters in the anime
         character_name = character_names[chidx]
         link = character_links[chidx]
@@ -112,6 +117,10 @@ def list_anime_characters(anime_name,images_path='',keep_filenames=False):
         os.makedirs(image_path,exist_ok=True)
         driver.get(link)
         time.sleep(5)
+        # Now that we're on the page, we try to get alternative character names, which will be in the title in ""
+        elem = driver.find_element(By.CLASS_NAME,'title-name.h1_bold_none')
+        elem.text.partition('"')
+        # Now we want to extract the image that comes with the character, as for minor characters we won't find one elsewhere.
         elem = driver.find_element(By.CLASS_NAME,'portrait-225x350.lazyloaded') # find main character image on the page
         image_url = elem.get_attribute('src')
         # Download with wget
