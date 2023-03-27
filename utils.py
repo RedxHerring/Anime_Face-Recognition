@@ -94,38 +94,64 @@ def list_anime_characters(anime_name,images_path='',keep_filenames=False):
         character_name = elem.text.partition("\n")[0]
         if ',' in character_name:
             lastfirst = character_name.partition(",")
-            character_name = lastfirst[2] + "_" + lastfirst[0]
+            character_name = lastfirst[2] + " " + lastfirst[0]
             if character_name[0] == " ": # extra space is generated
                 character_name = character_name[1:]
-        character_name = character_name.replace(" ","_")
+        character_name = character_name
         while character_name in character_names: # Character name already present
             if char_is_num(character_name[-1]):
                 character_name = character_name[0:-1] + str(int(character_name[-1])+1)
             else:
-                character_name = character_name + '_1'
+                character_name = character_name + " 1"
         character_names.append(character_name)
         # Use class and css to find character page link.
         link_elem = elem.find_element(By.CLASS_NAME,'spaceit_pad').find_element(By.CSS_SELECTOR,'a')
         character_links.append(link_elem.get_attribute('href'))
     
     # Create table with character name and links, as well as any alternative names.
-
+    d = {'Name': character_names, 'Other_Names': character_names, 'Link': character_links, 'Image_Link': character_links}
+    # Note we reused variables to initialize the table values,a nd we will modify them as we loop through
+    df = pd.DataFrame(data=d)
     for chidx in range(len(character_names)): # Loop through all characters in the anime
         character_name = character_names[chidx]
         link = character_links[chidx]
-        image_path = os.path.join(images_path,character_name)
+        image_path = os.path.join(images_path,character_name.replace(" ","_"))
         os.makedirs(image_path,exist_ok=True)
         driver.get(link)
         time.sleep(5)
         # Now that we're on the page, we try to get alternative character names, which will be in the title in ""
         elem = driver.find_element(By.CLASS_NAME,'title-name.h1_bold_none')
-        elem.text.partition('"')
+        names_list = elem.text.split('"')
+        if len(names_list) > 1:
+            df.Other_Names[chidx] = names_list[1]
         # Now we want to extract the image that comes with the character, as for minor characters we won't find one elsewhere.
         elem = driver.find_element(By.CLASS_NAME,'portrait-225x350.lazyloaded') # find main character image on the page
         image_url = elem.get_attribute('src')
+        df.Image_Link[chidx] = image_url
         # Download with wget
         wget.download(image_url,out=image_path)
+    # With the dataframe table complete, save it to a csv
+    df.to_csv(anime_name.replace(' ','_') + '-Characters.csv')
+
+
+def get_character_images(anime_file,images_path=''):
+    df = pd.read_csv(anime_file)
+
+    # Parameters
+    number_of_images = 500              # Desired number of images
+    headless = True                     # True = No Chrome GUI
+    min_resolution = (0, 0)             # Minimum desired image resolution
+    max_resolution = (9999, 9999)       # Maximum desired image resolution
+    max_missed = 1000                   # Max number of failed images before exit
+    number_of_workers = 1               # Number of "workers" used
+    keep_filenames = False              # Keep original URL image filenames
+    for idx in df.index:
+        image_path = os.path.join(images_path,df.Name[idx].replace(" ","_"))
+        search_keys = [df.Name[idx]]
+
 
 
 if __name__ == '__main__':
-    list_anime_characters('Monster','Images/original-images')
+    # list_anime_characters('Monster','Images/original-images')
+    get_character_images("Monster-Characters.csv",'Images/google-images')
+
