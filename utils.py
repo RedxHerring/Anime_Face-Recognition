@@ -14,6 +14,10 @@ import os
 import io
 import pandas as pd
 import wget
+from runGoogleImagScraper import worker_thread
+from patch import webdriver_executable
+import concurrent.futures
+
 
 # Function to return boolean True if image is black&white, and False otherwise
 def is_black_n_white(img):
@@ -109,7 +113,7 @@ def list_anime_characters(anime_name,images_path='',keep_filenames=False):
         character_links.append(link_elem.get_attribute('href'))
     
     # Create table with character name and links, as well as any alternative names.
-    d = {'Name': character_names, 'Other_Names': character_names, 'Link': character_links, 'Image_Link': character_links}
+    d = {'Name': character_names, 'Other_Names': ['']*len(character_names), 'Link': character_links, 'Image_Link': character_links}
     # Note we reused variables to initialize the table values,a nd we will modify them as we loop through
     df = pd.DataFrame(data=d)
     for chidx in range(len(character_names)): # Loop through all characters in the anime
@@ -136,18 +140,24 @@ def list_anime_characters(anime_name,images_path='',keep_filenames=False):
 
 def get_character_images(anime_file,images_path=''):
     df = pd.read_csv(anime_file)
-
+    # Define file path
+    webdriver_path = os.path.normpath(os.path.join(os.getcwd(), 'webdriver', webdriver_executable()))
     # Parameters
     number_of_images = 500              # Desired number of images
     headless = True                     # True = No Chrome GUI
     min_resolution = (0, 0)             # Minimum desired image resolution
     max_resolution = (9999, 9999)       # Maximum desired image resolution
     max_missed = 1000                   # Max number of failed images before exit
-    number_of_workers = 1               # Number of "workers" used
+    
     keep_filenames = False              # Keep original URL image filenames
     for idx in df.index:
         image_path = os.path.join(images_path,df.Name[idx].replace(" ","_"))
         search_keys = [df.Name[idx]]
+        if type(df.Other_Names[idx]) == str:
+            additional_keys = df.Other_Names[idx].split(',')
+            search_keys.extend(additional_keys)
+        for search_key in search_keys:
+            worker_thread(search_key,number_of_images,min_resolution,max_resolution,image_path,webdriver_path,keep_filenames,headless)
 
 
 

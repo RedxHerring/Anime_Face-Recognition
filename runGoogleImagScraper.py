@@ -13,9 +13,9 @@ from GoogleImageScraper import GoogleImageScraper
 from patch import webdriver_executable
 
 
-def worker_thread(search_key):
+def worker_thread(search_key, num_images,min_res,max_res,image_path,webdriver_path,keep_filenames=False,headless=True):
     image_scraper = GoogleImageScraper(
-        webdriver_path, image_path, search_key, number_of_images, headless, min_resolution, max_resolution)
+        webdriver_path, image_path, search_key, num_images, headless, min_res, max_res)
     image_urls = image_scraper.find_image_urls()
     image_scraper.save_images(image_urls, keep_filenames)
 
@@ -46,4 +46,4 @@ if __name__ == "__main__":
     #Automatically waits for all threads to finish
     #Removes duplicate strings from search_keys
     with concurrent.futures.ThreadPoolExecutor(max_workers=number_of_workers) as executor:
-        executor.map(worker_thread, search_keys)
+        executor.map(worker_thread, search_keys,number_of_images,min_resolution,max_resolution,image_path,webdriver_path,keep_filenames,headless)
