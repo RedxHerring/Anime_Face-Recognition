@@ -14,7 +14,7 @@ import os
 import io
 import pandas as pd
 import wget
-from runGoogleImagScraper import worker_thread
+from runGoogleImagScraper import parallel_worker_threads
 from patch import webdriver_executable
 import concurrent.futures
 
@@ -140,24 +140,17 @@ def list_anime_characters(anime_name,images_path='',keep_filenames=False):
 
 def get_character_images(anime_file,images_path=''):
     df = pd.read_csv(anime_file)
-    # Define file path
-    webdriver_path = os.path.normpath(os.path.join(os.getcwd(), 'webdriver', webdriver_executable()))
-    # Parameters
-    number_of_images = 500              # Desired number of images
-    headless = True                     # True = No Chrome GUI
-    min_resolution = (0, 0)             # Minimum desired image resolution
-    max_resolution = (9999, 9999)       # Maximum desired image resolution
-    max_missed = 1000                   # Max number of failed images before exit
-    
-    keep_filenames = False              # Keep original URL image filenames
+    anime_name = anime_file.split('-')[0]
+    append_str = f" {anime_name} anime"
     for idx in df.index:
         image_path = os.path.join(images_path,df.Name[idx].replace(" ","_"))
-        search_keys = [df.Name[idx]]
+        character_names = [df.Name[idx]]
         if type(df.Other_Names[idx]) == str:
             additional_keys = df.Other_Names[idx].split(',')
-            search_keys.extend(additional_keys)
-        for search_key in search_keys:
-            worker_thread(search_key,number_of_images,min_resolution,max_resolution,image_path,webdriver_path,keep_filenames,headless)
+            character_names.extend(additional_keys)
+        search_keys = [s + append_str for s in character_names] # append anime name and "anime" in search text
+        token_names = [s.replace(" ","_") for s in character_names]
+        parallel_worker_threads(search_keys,token_names=token_names,imgs_path=image_path,num_images=500,maxmissed=1000)
 
 
 

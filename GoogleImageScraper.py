@@ -23,9 +23,8 @@ import re
 import patch
 
 class GoogleImageScraper():
-    def __init__(self, webdriver_path, image_path, search_key="cat", number_of_images=1, headless=True, min_resolution=(0, 0), max_resolution=(1920, 1080), max_missed=10):
+    def __init__(self, webdriver_path, image_path, search_key="cat", number_of_images=1, token_name="cat", headless=True, min_resolution=(0, 0), max_resolution=(1920, 1080), max_missed=10):
         #check parameter types
-        image_path = os.path.join(image_path, search_key)
         if (type(number_of_images)!=int):
             print("[Error] Number of images must be integer value.")
             return
@@ -58,6 +57,7 @@ class GoogleImageScraper():
 
         self.driver = driver
         self.search_key = search_key
+        self.token_name = token_name
         self.number_of_images = number_of_images
         self.webdriver_path = webdriver_path
         self.image_path = image_path
@@ -129,7 +129,7 @@ class GoogleImageScraper():
         return image_urls
 
     def save_images(self,image_urls, keep_filenames):
-        print(keep_filenames)
+        some_failed = False
         #save images into file directory
         """
             This function takes in an array of image urls and save it into the given image path/directory.
@@ -156,7 +156,7 @@ class GoogleImageScraper():
                                 #join filename and extension
                                 filename = "%s.%s"%(name,image_from_web.format.lower())
                             else:
-                                filename = "%s%s.%s"%(search_string,str(indx),image_from_web.format.lower())
+                                filename = "%s_%s.%s"%(self.token_name,str(indx),image_from_web.format.lower())
 
                             image_path = os.path.join(self.image_path, filename)
                             print(
@@ -174,6 +174,11 @@ class GoogleImageScraper():
                         image_from_web.close()
             except Exception as e:
                 print("[ERROR] Download failed: ",e)
+                some_failed = True
                 pass
         print("--------------------------------------------------")
-        print("[INFO] Downloads completed. Please note that some photos were not downloaded as they were not in the correct format (e.g. jpg, jpeg, png)")
+        if some_failed:
+            print("[INFO] Downloads completed. Please note that some photos were not downloaded as they were not in the correct format (e.g. jpg, jpeg, png)")
+        else:
+            print("[INFO] All downloads completed successfully.") 
+
