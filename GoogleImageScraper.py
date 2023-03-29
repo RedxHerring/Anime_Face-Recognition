@@ -84,72 +84,46 @@ class GoogleImageScraper():
 
         """
         print("[INFO] Gathering image links")
+        image_urls = [''] * self.number_of_images
+        image_title_similarities = np.zeros(self.number_of_images)
         doc_s = nlp(self.search_key)
-        count = 0
         missed_count = 0
         self.driver.get(self.url)
         WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, "rg_i.Q4LuWd")))
-        indx = 1
+        idx = 0
         elems = self.driver.find_elements(By.CLASS_NAME,"rg_i.Q4LuWd") # Find images in page
         Le = len(elems)
-        image_urls = [''] * Le
-        image_title_similarities = np.zeros(Le)
-        for idx in range(Le): # loop through image elements
-            elem = elems[idx]
-            elem.click() # click on image to open side bar
-            WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, "l39u4d")))
-            side_bar = self.driver.find_element(By.CLASS_NAME,'l39u4d')
-            image_urls[idx] = side_bar.find_element(By.CLASS_NAME,'n3VNCb.pT0Scc.KAlRDb').get_attribute('src')
-            main_img_title = side_bar.text.split('\n')[1]
-            if len(main_img_title) == 0:
-                main_img_title = side_bar.find_element(By.CLASS_NAME,'eYbsle.mKq8g.cS4Vcb-pGL6qe-fwJd0c').text
-            # Now we compare the title to the search prompt with a large language model to evaluate the similarity
-            doc_i = nlp(main_img_title)
-            image_title_similarities[idx] = doc_s.similarity(doc_i)
-            if idx > 3:
-                simoothed = interpolate.splrep(np.arange(idx), image_title_similarities[0:idx],k=3,s=200)
-
-        while self.number_of_images > count:
-            try:
-                #find and click image
-                imgurl = self.driver.find_element(By.XPATH,'//*[@id="islrg"]/div[1]/div[%s]/a[1]/div[1]/img'%(str(indx)))
-                imgurl.click()
-                missed_count = 0
-            except Exception:
-                missed_count = missed_count + 1
-                if (missed_count>self.max_missed):
-                    print("[INFO] Maximum missed photos reached, exiting...")
+        while idx < self.number_of_images:
+            nfails = 0
+            while nfails < 3:
+                try:
+                    elem = elems[idx] # go to next image
+                    elem.click() # click on image to open side bar
+                    WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, "l39u4d")))
+                    side_bar = self.driver.find_element(By.CLASS_NAME,'l39u4d')
+                    try:
+                        image_urls[idx] = side_bar.find_element(By.CLASS_NAME,'n3VNCb.pT0Scc.KAlRDb').get_attribute('src')
+                    except:
+                        image_urls[idx] = side_bar.find_element(By.CLASS_NAME,'n3VNCb.pT0Scc').get_attribute('src')
+                    main_img_title = side_bar.text.split('\n')[1]
+                    if len(main_img_title) == 0:
+                        main_img_title = side_bar.find_element(By.CLASS_NAME,'eYbsle.mKq8g.cS4Vcb-pGL6qe-fwJd0c').text
+                    # Now we compare the title to the search prompt with a large language model to evaluate the similarity
+                    doc_i = nlp(main_img_title)
+                    image_title_similarities[idx] = doc_s.similarity(doc_i)
+                    # If we get through without failing
                     break
-
-            try:
-                #select image from the popup
-                time.sleep(1)
-                class_names = ["n3VNCb"]
-                images = [self.driver.find_elements(By.CLASS_NAME, class_name) for class_name in class_names if len(self.driver.find_elements(By.CLASS_NAME, class_name)) != 0 ][0]
-                for image in images:
-                    #only download images that starts with http
-                    src_link = image.get_attribute("src")
-                    if(("http" in  src_link) and (not "encrypted" in src_link)):
-                        print(
-                            f"[INFO] {self.search_key} \t #{count} \t {src_link}")
-                        image_urls.append(src_link)
-                        count +=1
-                        break
-            except Exception:
-                print("[INFO] Unable to get link")
-
-            try:
-                #scroll page to load next image
-                if(count%3==0):
-                    self.driver.execute_script("window.scrollTo(0, "+str(indx*60)+");")
-                element = self.driver.find_element(By.CLASS_NAME,"mye4qd")
-                element.click()
-                print("[INFO] Loading next page")
-                time.sleep(3)
-            except Exception:
-                time.sleep(1)
-            indx += 1
-
+                except: 
+                    nfails += 1
+            if idx%10 == 0 and idx >= 10: # run every 10
+                simoothed = interpolate.splrep(np.arange(idx), image_title_similarities[0:idx],k=3,s=200)
+            idx += 1
+            # Check to see if scrolling is necessary
+            if idx > Le:
+                self.driver.execute_script("window.scrollTo(0,document.body.scrollHeight)")
+                WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, "rg_i.Q4LuWd")))
+                elems = self.driver.find_elements(By.CLASS_NAME,"rg_i.Q4LuWd") # Find images in page
+                Le = len(elems)
 
         self.driver.quit()
         print("[INFO] Google search ended")
