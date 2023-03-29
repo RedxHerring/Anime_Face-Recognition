@@ -9,6 +9,8 @@ from selenium import webdriver
 # make sure geckodriver installed in default locaiton for OS. For linux installation the package manager should do its job here.
 from selenium.webdriver.firefox.options import Options 
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
 #import helper libraries
 import time
@@ -18,6 +20,12 @@ import requests
 import io
 from PIL import Image
 import re
+# using https://stackoverflow.com/questions/65199011/is-there-a-way-to-check-similarity-between-two-full-sentences-in-python
+import spacy
+# python -m spacy download en_core_web_lg
+nlp = spacy.load("en_core_web_lg") # large language model
+import numpy as np
+from scipy import interpolate
 
 #custom patch libraries
 import patch
@@ -76,24 +84,30 @@ class GoogleImageScraper():
 
         """
         print("[INFO] Gathering image links")
-        image_urls=[]
+        doc_s = nlp(self.search_key)
         count = 0
         missed_count = 0
         self.driver.get(self.url)
-        time.sleep(3)
+        WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, "rg_i.Q4LuWd")))
         indx = 1
         elems = self.driver.find_elements(By.CLASS_NAME,"rg_i.Q4LuWd") # Find images in page
-        for elem in elems: # loop through image elements
+        Le = len(elems)
+        image_urls = [''] * Le
+        image_title_similarities = np.zeros(Le)
+        for idx in range(Le): # loop through image elements
+            elem = elems[idx]
             elem.click() # click on image to open side bar
-            nattempts = 0
-            while nattempts < 10:
-                try:
-                    side_bar = self.driver.find_element(By.CLASS_NAME,'l39u4d')
-                    main_img_link = side_bar.find_element(By.CLASS_NAME,'n3VNCb.pT0Scc.KAlRDb').get_attribute('src')
-                    main_img_title = side_bar.find_element(By.CLASS_NAME,'eYbsle.mKq8g.cS4Vcb-pGL6qe-fwJd0c').text
-                except:
-                    nattempts += 1
-                    time.sleep(1)
+            WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, "l39u4d")))
+            side_bar = self.driver.find_element(By.CLASS_NAME,'l39u4d')
+            image_urls[idx] = side_bar.find_element(By.CLASS_NAME,'n3VNCb.pT0Scc.KAlRDb').get_attribute('src')
+            main_img_title = side_bar.text.split('\n')[1]
+            if len(main_img_title) == 0:
+                main_img_title = side_bar.find_element(By.CLASS_NAME,'eYbsle.mKq8g.cS4Vcb-pGL6qe-fwJd0c').text
+            # Now we compare the title to the search prompt with a large language model to evaluate the similarity
+            doc_i = nlp(main_img_title)
+            image_title_similarities[idx] = doc_s.similarity(doc_i)
+            if idx > 3:
+                simoothed = interpolate.splrep(np.arange(idx), image_title_similarities[0:idx],k=3,s=200)
 
         while self.number_of_images > count:
             try:

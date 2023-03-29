@@ -52,7 +52,7 @@ def parallel_worker_threads(search_keys=['cat'],token_names=['image'],imgs_path=
 
     number_of_workers = len(search_keys) # Number of "workers" used
     if len(token_names) != number_of_workers:
-        token_name = token_names[0]*len(search_keys)
+        token_names = [token_names[0]]*len(search_keys)
     #Run each search_key in a separate thread
     #Automatically waits for all threads to finish
     #Removes duplicate strings from search_keys
