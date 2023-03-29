@@ -82,6 +82,19 @@ class GoogleImageScraper():
         self.driver.get(self.url)
         time.sleep(3)
         indx = 1
+        elems = self.driver.find_elements(By.CLASS_NAME,"rg_i.Q4LuWd") # Find images in page
+        for elem in elems: # loop through image elements
+            elem.click() # click on image to open side bar
+            nattempts = 0
+            while nattempts < 10:
+                try:
+                    side_bar = self.driver.find_element(By.CLASS_NAME,'l39u4d')
+                    main_img_link = side_bar.find_element(By.CLASS_NAME,'n3VNCb.pT0Scc.KAlRDb').get_attribute('src')
+                    main_img_title = side_bar.find_element(By.CLASS_NAME,'eYbsle.mKq8g.cS4Vcb-pGL6qe-fwJd0c').text
+                except:
+                    nattempts += 1
+                    time.sleep(1)
+
         while self.number_of_images > count:
             try:
                 #find and click image
