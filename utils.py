@@ -153,7 +153,6 @@ def get_character_images(anime_file,images_path=''):
         parallel_worker_threads(search_keys,token_names=token_names,imgs_path=image_path,num_images=500,maxmissed=1000)
 
 
-
 if __name__ == '__main__':
     # list_anime_characters('Monster','Images/original-images')
     get_character_images("Monster-Characters.csv",'Images/google-images')
