@@ -74,6 +74,27 @@ class GoogleImageScraper():
         self.max_resolution = max_resolution
         self.max_missed = max_missed
 
+    def loadnscroll(self,class_name):
+        try:
+            self.driver.get(self.url)
+            WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, class_name)))
+            elems = self.driver.find_elements(By.CLASS_NAME,class_name) # Find images in page
+            Le = len(elems)
+            ntries = 0
+            while Le < self.number_of_images:
+                self.driver.execute_script("window.scrollTo(0,document.body.scrollHeight)")
+                WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, class_name)))
+                elems = self.driver.find_elements(By.CLASS_NAME,class_name) # Find images in page
+                if Le == len(elems): # no new elems found
+                    ntries += 1
+                    time.sleep(1)
+                    if ntries >= 4: # end of page with no more that can be loaded
+                        break
+                Le = len(elems)
+        except:
+            elems = self.loadnscroll(class_name)
+        return elems
+
     def find_image_urls(self):
         """
             This function search and return a list of image urls based on the search key.
@@ -93,11 +114,8 @@ class GoogleImageScraper():
         sentence1_emb = model.encode(self.search_key.lower(), show_progress_bar=False)
         sentence1_emb = sentence1_emb/np.sqrt(np.sum(sentence1_emb**2))
         missed_count = 0
-        self.driver.get(self.url)
-        WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, "rg_i.Q4LuWd")))
+        elems = self.loadnscroll("rg_i.Q4LuWd")
         idx = 0
-        elems = self.driver.find_elements(By.CLASS_NAME,"rg_i.Q4LuWd") # Find images in page
-        Le = len(elems)
         winlen = min(25,self.number_of_images)
         while idx < self.number_of_images:
             nfails = 0
@@ -118,22 +136,17 @@ class GoogleImageScraper():
                     sentence2_emb = model.encode(main_img_title.lower(), show_progress_bar=False)
                     sentence2_emb = sentence2_emb/np.sqrt(np.sum(sentence2_emb**2))
                     image_title_similarities[idx] = sentence1_emb.T@sentence2_emb # take inner product
+                    print(f"[INFO] {self.search_key} \t #{idx} \t {image_urls[idx]}")
                     # If we get through without failing
                     break
                 except: 
+                    # reload assumign order won't change significantly, if at all
+                    elems = loadnscroll(self,"rg_i.Q4LuWd")
                     nfails += 1
             if idx%winlen == 0 and idx > 0: # run every winlen
                 # simoothed = savgol_filter(image_title_similarities[0:idx],10,3)
                 simoothed = np.convolve(image_title_similarities[0:idx], np.ones(winlen), 'same') / winlen
             idx += 1
-            # Check to see if scrolling is necessary
-            if idx > Le:
-                self.driver.execute_script("window.scrollTo(0,document.body.scrollHeight)")
-                WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, "rg_i.Q4LuWd")))
-                elems = self.driver.find_elements(By.CLASS_NAME,"rg_i.Q4LuWd") # Find images in page
-                if Le == len(elems): # no new elems found, ie end of page with no more that can be loaded
-                    break
-                Le = len(elems)
 
         self.driver.quit()
         print("[INFO] Google search ended")
