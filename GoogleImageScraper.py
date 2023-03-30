@@ -26,6 +26,7 @@ import spacy
 nlp = spacy.load("en_core_web_lg") # large language model
 import numpy as np
 from scipy import interpolate
+import matplotlib.pyplot as plt
 
 #custom patch libraries
 import patch
@@ -83,10 +84,11 @@ class GoogleImageScraper():
                 image_urls = google_image_scraper.find_image_urls()
 
         """
+        do_plots = True
         print("[INFO] Gathering image links")
         image_urls = [''] * self.number_of_images
         image_title_similarities = np.zeros(self.number_of_images)
-        doc_s = nlp(self.search_key)
+        doc_s = nlp(self.search_key.lower())
         missed_count = 0
         self.driver.get(self.url)
         WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, "rg_i.Q4LuWd")))
@@ -109,14 +111,15 @@ class GoogleImageScraper():
                     if len(main_img_title) == 0:
                         main_img_title = side_bar.find_element(By.CLASS_NAME,'eYbsle.mKq8g.cS4Vcb-pGL6qe-fwJd0c').text
                     # Now we compare the title to the search prompt with a large language model to evaluate the similarity
-                    doc_i = nlp(main_img_title)
+                    doc_i = nlp(main_img_title.lower())
                     image_title_similarities[idx] = doc_s.similarity(doc_i)
                     # If we get through without failing
                     break
                 except: 
                     nfails += 1
             if idx%10 == 0 and idx >= 10: # run every 10
-                simoothed = interpolate.splrep(np.arange(idx), image_title_similarities[0:idx],k=3,s=200)
+                x = np.arange(idx)
+                simoothed = interpolate.splrep(x, image_title_similarities[0:idx],k=3,s=200)
             idx += 1
             # Check to see if scrolling is necessary
             if idx > Le:
@@ -124,7 +127,9 @@ class GoogleImageScraper():
                 WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, "rg_i.Q4LuWd")))
                 elems = self.driver.find_elements(By.CLASS_NAME,"rg_i.Q4LuWd") # Find images in page
                 Le = len(elems)
-
+        if do_plots:
+            plt.plot(x,simoothed)
+            plt.show()
         self.driver.quit()
         print("[INFO] Google search ended")
         return image_urls
