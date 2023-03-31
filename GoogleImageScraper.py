@@ -14,6 +14,7 @@ from selenium.webdriver.support import expected_conditions as EC
 
 #import helper libraries
 import time
+from datetime import datetime
 from urllib.parse import urlparse
 import os
 import requests
@@ -75,24 +76,40 @@ class GoogleImageScraper():
         self.max_missed = max_missed
 
     def loadnscroll(self,class_name):
-        try:
-            self.driver.get(self.url)
+        print(f"[INFO] Loading {self.url}")
+        max_wait_time = 5 # time to wait for images to load, in seconds
+        self.driver.get(self.url)
+        WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, class_name)))
+        elems = self.driver.find_elements(By.CLASS_NAME,class_name) # Find images in page
+        Le = len(elems)
+        loaded_more = False
+        while Le < self.number_of_images:
+            self.driver.execute_script("window.scrollTo(0,document.body.scrollHeight)")
             WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, class_name)))
             elems = self.driver.find_elements(By.CLASS_NAME,class_name) # Find images in page
-            Le = len(elems)
-            ntries = 0
-            while Le < self.number_of_images:
-                self.driver.execute_script("window.scrollTo(0,document.body.scrollHeight)")
-                WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, class_name)))
+            t1 = datetime.now()
+            while Le == len(elems): # check if new elems have loaded
+                t2 = datetime.now()
                 elems = self.driver.find_elements(By.CLASS_NAME,class_name) # Find images in page
-                if Le == len(elems): # no new elems found
-                    ntries += 1
-                    time.sleep(1)
-                    if ntries >= 4: # end of page with no more that can be loaded
+                if (t2-t1).seconds >= max_wait_time: # no more images will load
+                    if loaded_more: 
                         break
-                Le = len(elems)
-        except:
-            elems = self.loadnscroll(class_name)
+                    else: # Haven't clicked button at the bottom yet
+                        elemss = self.driver.find_elements(By.CLASS_NAME,"mye4qd") # button at bottom
+                        idx = 0
+                        while idx < len(elemss): # one is "Show more results" button
+                            try:
+                                elemss[idx].click()
+                                idx += 1
+                            except:
+                                idx += 1
+                        loaded_more = True
+                        t1 = datetime.now() # reset clock
+            if Le == len(elems): # no more images will load even after waiting
+                break
+            Le = len(elems)
+        # Find images in now fully-loaded page
+        elems = self.driver.find_elements(By.CLASS_NAME,class_name) 
         return elems
 
     def find_image_urls(self):
@@ -114,10 +131,10 @@ class GoogleImageScraper():
         sentence1_emb = model.encode(self.search_key.lower(), show_progress_bar=False)
         sentence1_emb = sentence1_emb/np.sqrt(np.sum(sentence1_emb**2))
         missed_count = 0
-        elems = self.loadnscroll("rg_i.Q4LuWd")
+        elems = self.loadnscroll("rg_i.Q4LuWd") # load as much of the page as possible
         idx = 0
         winlen = min(25,self.number_of_images)
-        while idx < self.number_of_images:
+        while idx < len(elems):
             nfails = 0
             while nfails < 3:
                 try:
@@ -129,6 +146,7 @@ class GoogleImageScraper():
                         image_urls[idx] = side_bar.find_element(By.CLASS_NAME,'n3VNCb.pT0Scc.KAlRDb').get_attribute('src')
                     except:
                         image_urls[idx] = side_bar.find_element(By.CLASS_NAME,'n3VNCb.pT0Scc').get_attribute('src')
+                    print(f"[INFO] {self.search_key} \t #{idx} \t {image_urls[idx]}")
                     main_img_title = side_bar.text.split('\n')[1]
                     if len(main_img_title) == 0:
                         main_img_title = side_bar.find_element(By.CLASS_NAME,'eYbsle.mKq8g.cS4Vcb-pGL6qe-fwJd0c').text
@@ -136,12 +154,12 @@ class GoogleImageScraper():
                     sentence2_emb = model.encode(main_img_title.lower(), show_progress_bar=False)
                     sentence2_emb = sentence2_emb/np.sqrt(np.sum(sentence2_emb**2))
                     image_title_similarities[idx] = sentence1_emb.T@sentence2_emb # take inner product
-                    print(f"[INFO] {self.search_key} \t #{idx} \t {image_urls[idx]}")
+                    print(f"[INFO] {self.search_key} \t #{idx} \t has inner product of {image_title_similarities[idx]} with {main_img_title}")
                     # If we get through without failing
                     break
                 except: 
-                    # reload assumign order won't change significantly, if at all
-                    elems = loadnscroll(self,"rg_i.Q4LuWd")
+                    # try reloading, assuming order won't change significantly, if at all
+                    elems = self.loadnscroll(self,"rg_i.Q4LuWd")
                     nfails += 1
             if idx%winlen == 0 and idx > 0: # run every winlen
                 # simoothed = savgol_filter(image_title_similarities[0:idx],10,3)
