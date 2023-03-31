@@ -7,7 +7,8 @@ Created on Sat Jul 18 13:01:02 2020
 #import selenium drivers
 from selenium import webdriver
 # make sure geckodriver installed in default locaiton for OS. For linux installation the package manager should do its job here.
-from selenium.webdriver.firefox.options import Options 
+from selenium.webdriver.firefox.options import Options as FOptions
+from selenium.webdriver.chrome.options import Options as COptions
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -49,7 +50,7 @@ class GoogleImageScraper():
         for i in range(1):
             try:
                 #try going to www.google.com
-                firefox_options = Options()
+                firefox_options = FOptions()
                 if headless:
                     firefox_options.add_argument("--headless")
                 driver = webdriver.Firefox(options=firefox_options)
