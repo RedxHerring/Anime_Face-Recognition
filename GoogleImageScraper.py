@@ -25,7 +25,7 @@ import re
 from sentence_transformers import SentenceTransformer
 import numpy as np
 import pandas as pd
-
+from itertools import compress
 
 #custom patch libraries
 import patch
@@ -127,12 +127,14 @@ class GoogleImageScraper():
         model = SentenceTransformer('stsb-mpnet-base-v2')
 
         # Also make a list of strings to check for in image titles to remove fanart, etc
-        reject_strings = ["danbooru"]
+        reject_strings = ["danbooru","cosplay","poster","wallpaper","stl"]
 
         print("[INFO] Gathering image links")
         dfimg = pd.DataFrame({'url': [''] * self.number_of_images,
                               'title': [''] * self.number_of_images,
                               'similarity': [0] * self.number_of_images})
+        sim_thresh = .5
+
         sentence1_emb = model.encode(self.search_key.lower(), show_progress_bar=False)
         sentence1_emb = sentence1_emb/np.sqrt(np.sum(sentence1_emb**2))
         elems = self.loadnscroll("rg_i.Q4LuWd") # load as much of the page as possible
@@ -170,6 +172,8 @@ class GoogleImageScraper():
             idx += 1
         simoothed = np.convolve(dfimg['similarity'][0:idx], np.ones(winlen), 'same') / winlen
         self.driver.quit()
+        dfimg.to_csv(os.path.join(self.image_path,self.token_name+'results.csv'))
+        image_urls = list(compress(dfimg['url'].to_list(),dfimg["similarity"]>sim_thresh))
         print("[INFO] Google search ended")
         return list(set(image_urls)) # sets remove any duplicates
 
