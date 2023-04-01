@@ -8,10 +8,10 @@ Created on Sat Jul 18 13:01:02 2020
 from selenium import webdriver
 # make sure geckodriver installed in default locaiton for OS. For linux installation the package manager should do its job here.
 from selenium.webdriver.firefox.options import Options as FOptions
-from selenium.webdriver.chrome.options import Options as COptions
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from webdriver_manager.firefox import GeckoDriverManager
 
 #import helper libraries
 import time
@@ -24,7 +24,6 @@ from PIL import Image
 import re
 from sentence_transformers import SentenceTransformer
 import numpy as np
-from scipy.signal import savgol_filter
 import pandas as pd
 
 
@@ -53,7 +52,7 @@ class GoogleImageScraper():
                 firefox_options = FOptions()
                 if headless:
                     firefox_options.add_argument("--headless")
-                driver = webdriver.Firefox(options=firefox_options)
+                driver = webdriver.Firefox(executable_path=GeckoDriverManager().install(), options=firefox_options)
                 driver.set_window_size(1400,1050)
                 driver.get("https://www.google.com")
             except Exception as e:
@@ -111,6 +110,7 @@ class GoogleImageScraper():
             Le = len(elems)
         # Find images in now fully-loaded page
         elems = self.driver.find_elements(By.CLASS_NAME,class_name) 
+        self.driver.execute_script("window.scrollTo(0,0)") # scroll back to top
         return elems
 
     def find_image_urls(self):
@@ -126,12 +126,15 @@ class GoogleImageScraper():
         # Load the pre-trained model
         model = SentenceTransformer('stsb-mpnet-base-v2')
 
+        # Also make a list of strings to check for in image titles to remove fanart, etc
+        reject_strings = ["danbooru"]
+
         print("[INFO] Gathering image links")
-        image_urls = [''] * self.number_of_images
-        image_title_similarities = np.zeros(self.number_of_images)
+        dfimg = pd.DataFrame({'url': [''] * self.number_of_images,
+                              'title': [''] * self.number_of_images,
+                              'similarity': [0] * self.number_of_images})
         sentence1_emb = model.encode(self.search_key.lower(), show_progress_bar=False)
         sentence1_emb = sentence1_emb/np.sqrt(np.sum(sentence1_emb**2))
-        missed_count = 0
         elems = self.loadnscroll("rg_i.Q4LuWd") # load as much of the page as possible
         idx = 0
         winlen = min(25,self.number_of_images)
@@ -144,29 +147,28 @@ class GoogleImageScraper():
                     WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, "l39u4d")))
                     side_bar = self.driver.find_element(By.CLASS_NAME,'l39u4d')
                     try:
-                        image_urls[idx] = side_bar.find_element(By.CLASS_NAME,'n3VNCb.pT0Scc.KAlRDb').get_attribute('src')
+                        dfimg.at[idx,'url'] = side_bar.find_element(By.CLASS_NAME,'n3VNCb.pT0Scc.KAlRDb').get_attribute('src')
                     except:
-                        image_urls[idx] = side_bar.find_element(By.CLASS_NAME,'n3VNCb.pT0Scc').get_attribute('src')
-                    print(f"[INFO] {self.search_key} \t #{idx} \t {image_urls[idx]}")
-                    main_img_title = side_bar.text.split('\n')[1]
-                    if len(main_img_title) == 0:
-                        main_img_title = side_bar.find_element(By.CLASS_NAME,'eYbsle.mKq8g.cS4Vcb-pGL6qe-fwJd0c').text
+                        dfimg.at[idx,'url'] = side_bar.find_element(By.CLASS_NAME,'n3VNCb.pT0Scc').get_attribute('src')
+                    print(f"[INFO] {self.search_key} \t #{idx} \t {dfimg['url'][idx]}")
+                    dfimg.at[idx,'title'] = side_bar.text.split('\n')[1]
+                    if len(dfimg['title'][idx]) == 0:
+                        dfimg.at[idx,'title'] = side_bar.find_element(By.CLASS_NAME,'eYbsle.mKq8g.cS4Vcb-pGL6qe-fwJd0c').text.lower()
                     # Now we compare the title to the search prompt with a large language model to evaluate the similarity
-                    sentence2_emb = model.encode(main_img_title.lower(), show_progress_bar=False)
+                    sentence2_emb = model.encode(dfimg['title'][idx], show_progress_bar=False)
                     sentence2_emb = sentence2_emb/np.sqrt(np.sum(sentence2_emb**2))
-                    image_title_similarities[idx] = sentence1_emb.T@sentence2_emb # take inner product
-                    print(f"[INFO] {self.search_key} \t #{idx} \t has inner product of {image_title_similarities[idx]} with {main_img_title}")
+                    if any(rjstr in dfimg['title'][idx] for rjstr in reject_strings):
+                        dfimg.at[idx,'similarity'] = 0 # not looking for content with this string in its title
+                        print("[Info] Image rejected due to rejected content in image title.")
+                    else:   
+                        dfimg.at[idx,'similarity'] = sentence1_emb.T@sentence2_emb # take inner product
+                        print(f"[INFO] '{self.search_key}' has inner product of {dfimg['similarity'][idx]} with '{dfimg['title'][idx]}'")
                     # If we get through without failing
                     break
                 except: 
-                    # try reloading, assuming order won't change significantly, if at all
-                    elems = self.loadnscroll(self,"rg_i.Q4LuWd")
                     nfails += 1
-            if idx%winlen == 0 and idx > 0: # run every winlen
-                # simoothed = savgol_filter(image_title_similarities[0:idx],10,3)
-                simoothed = np.convolve(image_title_similarities[0:idx], np.ones(winlen), 'same') / winlen
             idx += 1
-
+        simoothed = np.convolve(dfimg['similarity'][0:idx], np.ones(winlen), 'same') / winlen
         self.driver.quit()
         print("[INFO] Google search ended")
         return list(set(image_urls)) # sets remove any duplicates
