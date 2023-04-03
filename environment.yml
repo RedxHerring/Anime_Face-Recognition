@@ -1,4 +1,4 @@
-name: python310
+name: anime-face-recognition
 channels:
   - defaults
 dependencies:

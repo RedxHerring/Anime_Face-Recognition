@@ -7,7 +7,7 @@ Created on Sat Jul 18 13:01:02 2020
 #import selenium drivers
 from selenium import webdriver
 # make sure geckodriver installed in default locaiton for OS. For linux installation the package manager should do its job here.
-from selenium.webdriver.firefox.options import Options as FOptions
+from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -49,7 +49,7 @@ class GoogleImageScraper():
         for i in range(1):
             try:
                 #try going to www.google.com
-                firefox_options = FOptions()
+                firefox_options = Options()
                 if headless:
                     firefox_options.add_argument("--headless")
                 driver = webdriver.Firefox(executable_path=GeckoDriverManager().install(), options=firefox_options)
@@ -130,17 +130,18 @@ class GoogleImageScraper():
         reject_strings = ["danbooru","cosplay","poster","wallpaper","stl"]
 
         print("[INFO] Gathering image links")
-        dfimg = pd.DataFrame({'url': [''] * self.number_of_images,
-                              'title': [''] * self.number_of_images,
-                              'similarity': [0] * self.number_of_images})
-        sim_thresh = .5
 
         sentence1_emb = model.encode(self.search_key.lower(), show_progress_bar=False)
         sentence1_emb = sentence1_emb/np.sqrt(np.sum(sentence1_emb**2))
         elems = self.loadnscroll("rg_i.Q4LuWd") # load as much of the page as possible
+        Le = len(elems)
+        dfimg = pd.DataFrame({'url': [''] * Le,
+                              'title': [''] * Le,
+                              'similarity': [0] * Le})
+        sim_thresh = .5
         idx = 0
-        winlen = min(25,self.number_of_images)
-        while idx < len(elems):
+        winlen = min(25,Le)
+        while idx < Le:
             nfails = 0
             while nfails < 3:
                 try:
@@ -172,7 +173,7 @@ class GoogleImageScraper():
             idx += 1
         simoothed = np.convolve(dfimg['similarity'][0:idx], np.ones(winlen), 'same') / winlen
         self.driver.quit()
-        dfimg.to_csv(os.path.join(self.image_path,self.token_name+'results.csv'))
+        dfimg.to_csv(os.path.join(self.image_path,self.token_name+'-results.csv'))
         image_urls = list(compress(dfimg['url'].to_list(),dfimg["similarity"]>sim_thresh))
         print("[INFO] Google search ended")
         return list(set(image_urls)) # sets remove any duplicates

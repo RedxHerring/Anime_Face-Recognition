@@ -1,0 +1,501 @@
+,url,title,similarity
+0,"data:image/jpeg;base64,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",Martin Reest | Naoki Urasawa's Monster Wiki | Fandom,0.5807446241378784
+1,https://static.wikia.nocookie.net/obluda/images/c/cf/58._I_Hate_This_Job.avi_snapshot_06.32_-2012.08.19_17.10.33-.jpg/revision/latest/thumbnail/width/360/height/360?cb=20121111234016,Martin Reest | Naoki Urasawa's Monster Wiki | Fandom,0.5807446241378784
+2,https://static.wikia.nocookie.net/obluda/images/7/74/Viera01.png/revision/latest/scale-to-width-down/688?cb=20130427085049,Anna (Věra Černá) | Naoki Urasawa's Monster Wiki | Fandom,0.5217224955558777
+3,https://static.wikia.nocookie.net/obluda/images/7/7c/PortraitJohan%27sMom.png/revision/latest?cb=20121109113740,Anna (Věra Černá) | Naoki Urasawa's Monster Wiki | Fandom,0.5217224955558777
+4,"https://m.media-amazon.com/images/M/MV5BOWNlMmJlNGEtY2QzZC00YjI2LTlhNzYtNmQxMzkwNGU2NWJiXkEyXkFqcGdeQXVyNzU1NzE3NTg@._V1_QL75_UX500_CR0,47,500,281_.jpg",1:32,-0.06540840119123459
+5,https://static.wikia.nocookie.net/obluda/images/6/6a/Viera02.png/revision/latest/scale-to-width-down/687?cb=20130427085326,Anna (Věra Černá) | Naoki Urasawa's Monster Wiki | Fandom,0.5217224955558777
+6,https://m.media-amazon.com/images/M/MV5BM2ZkYTAwMGMtOGEwOS00MzBjLTgxOGYtZTYwY2E1ZjMyZmY4XkEyXkFqcGdeQXVyNTgyNTA4MjM@._V1_FMjpg_UX1000_.jpg,Monster (TV Series 2004–2005) - IMDb,0.46637311577796936
+7,https://cdn.myanimelist.net/r/360x360/images/characters/13/294099.jpg?s=ef2228ebc26e847f08a076d02f2b55e1,Martin (Monster) - MyAnimeList.net,0.5177528262138367
+8,https://qph.cf2.quoracdn.net/main-qimg-9e480901766703de64edebf88909440a-lq,"Who do you think is the real monster, Johan or his mother? Do you think Johan is still alive? - Quora",0.2615131735801697
+9,https://animerantshome.files.wordpress.com/2019/04/johan-4.png?w=640,Johan Liebert and the Concept of Identity (Monster) – Anime Rants,0.5246871709823608
+10,https://occ-0-3933-33.1.nflxso.net/dnm/api/v6/6gmvu2hxdfnQ55LZZjyzYR4kzGk/AAAABU6roYeY8w9uOx176tnNRzaKQgRfWAWyczs_60yadac8JsBViAXpXFtN2rsshWR4YAqXlnzCnwHPlUJT8dJj5QjMpvNAqOA87WvO.jpg?r=3fe,Watch Monster | Netflix,0.3368139863014221
+11,https://nkoscorner.files.wordpress.com/2019/07/johan-liebert.png?w=1400,We Need To Talk About Monster's Ending – Nko's Corner,0.18638713657855988
+12,https://64.media.tumblr.com/a01009eece49e28ce50c4f9a32c65644/47765f9b370deee3-63/s1280x1920/7a1b8f82d001c51be151559d6b19246be07cafc3.png,Okaeri bitches — this scene still haunts many viewers decades after...,0.22784051299095154
+13,"data:image/jpeg;base64,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",Monster - Anime · 21:03,0.6454459428787231
+14,https://cdn.myanimelist.net/r/360x360/images/characters/8/289038.jpg?s=c296e4c3b9f9d826bf0308d4f01102ad,Martin Reest (Monster) - MyAnimeList.net,0.3839111924171448
+15,https://static.tvtropes.org/pmwiki/pub/images/mv5bmzzkoge4otitm2rlzi00zgm5ltlhmdatzwqxotlhytm5nmzkxkeyxkfqcgdeqxvymti2otmwndcw_v1.jpg,Monster (Manga) - TV Tropes,0.595862627029419
+16,https://upload.wikimedia.org/wikipedia/en/f/fb/Demi-chan_wa_Kataritai%2C_volume_1.jpg,Interviews with Monster Girls - Wikipedia,0.343088299036026
+17,"data:image/gif;base64,R0lGODlhAQABAIAAAP///////yH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==",Watch Monster | Netflix,0.3368139863014221
+18,"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wCEAAoHCBUVFRgVFRUYGBgYGBgZGhgYGBgYGBgYGBgaGRgYGBgcIS4lHB4rIRgYJjgmKy8xNTU1GiQ7QDs0Py40NTEBDAwMEA8QHhISGjQhISE0NDQ0NDQ0NDQ0MTE0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0MTQ0NDQ0NDQ0MT80ND8/ND80NP/AABEIAKgBLAMBIgACEQEDEQH/xAAbAAABBQEBAAAAAAAAAAAAAAADAAECBAUGB//EAD0QAAIBAgMFBQYEBQQCAwAAAAECAAMREiExBAVBUWEicYGRoQYTMlKxwULR4fAUFWJykgeCosIjsiTS8f/EABgBAQEBAQEAAAAAAAAAAAAAAAABAgME/8QAIREBAQEBAAIDAQADAQAAAAAAAAERAiExAxJBMiJRYRP/2gAMAwEAAhEDEQA/AOV92JCpSX6+kmUw8TBMBpx89TactaR2aiMy3hAts1gSTpNSiMTWw9lbH0vaW/4EZLrex8OUqMPYk1MuNRfCWwmwBN+E2tk2dVGQEDvipamR8xC+tz9JDHMbPT7ajkL+n6zRcStsK3dzyy9f0lxxNCo4mcs09oWyk9JnqIWLewpd0HMqPNp2P4gO8/b7zltzJesg63/xW86pfiPRfqT+U8/y+3bhY2HaGR1ddQb94zuDO+2baA6hl0I/YnnSHTu+wnQezO8ML+7Y5OTh6Ny8Y+Lr63Kz83H2m/sdcI6mOIwE9by5iQjlosEkE5wvlDHBs8k8GYc+rfRpEmOZzntj7SrsVIPhxu7YUS9gSBdiTyA+olZk10BaV9sPZ8QZ4tt3+oO3O+JagpjgiKpHmwJMtbk/1BroxG0saqMOShkNwbiwFx0mevMdeeLLrb/1Dp5U26svnY/nOI2bJxPQvbtQ2zK4zAdSDwIYHP6TzumbMD1E5c+netQR49o9pplCOBJYY4WBESrtt+zyzl0LK+3p2L8s4GeB3eMV+Fh5mOxz9fvE4zHcJqFRL24eRiFTofORcRkUxiaJj6Hzi953+kkFv3iL3Z5SZDWq6G4vpF7sXvND3S8o4oLymWw9mdQCc7m4tbprJ4yTccZeSglhlCe6XlGoSiwmRvyp8K8sTfYfebE5zfT3dzyAUfUyED3YnYJ5k+mX5y0yxtmSyKOkJaaRQ2/JbcyJQQS7vM5gd8ppCtj2cS9UnkrHzIE6Bz8Z6AehP/aY/ssnxt0Uedz+U2KhyPVrfQfaeb5P6dufSaa/v98IbZhmvDO9+uZgEOv75mW9k1HRT6ATDo9C2Jy1NGbUqpPeQJYEFsq2RByVR6CTee7n08XXs3vI7NIWiAmnPaYx8McCSYQYquZ5J/q6z+9pAjsFWKnmbqD4/nPX2QziPbH2OfaqiVabKhpo5wkFsTBlZQBewBsQfCE5mdOf9nt1bF/Dh1THVNNfeIbu6txAU/DfMX7pym9fZZ6dJ66nsI+BkN8aA2AL8L5i4Gl56ps9O2KvhKuSpqIbLhKKVcAnTW+ZsbCR3qFqbLUUshLKFbDmodsNr+YM8/2sr2fWWOH3NU95uuqDfFTe1yxOQwstgdMmI8JzN50+4N3LQpbUlV1DsGRFxEYgoYFrfCbkZccjOZA5AnuF50kuud9NpFvCYJSo7aoADBtBwl+m6sLqbiWyohhj4YXDFaRUAshWS4I5gw4EREDnrZfvhCIhYgdISqlmYcmv4GTXM6frLKlBZLnxln3KgeNo6Uhiwkf1dOcLTqhmYcvrFpIqVFC5lc4dCtoq9Ps3J1OV+UqX5aSAw3u/7EkN8P8AtRNz+X0/kEf+X0/kWPCscb+fr/isf+fPzP8Ais1m3fT+QQbbBT+QSeBmHfr8z5CVGr+8YCxuWBJM2jsFP5BEuxoCCFAIl8HlICStJhYsMgxd5Ht9wHrKnA90PtzXdu+3lADTylHU+zKWpE83PoAJbY5L1a/qTAbkNtnW39R8bk/lDW+Ach9v1nm6/qu/PoRNG7/sBL+zDPwt5mUKfw97f9vymru1LuBzZB5tItd9TaSJiCR8M9seK6iZRqb1pK+AvnexNjhB5FtAZW9o94NRQBci2IluQUXsOpNh5mc/s+7Cfiq1AQoYkPk2O9+wwyzvn0kvUntrni12tOurfCwPcQYcGcCabUWDpULFWXEhwhhc6Yl1vaxGdsV53FJ8ShhoQCO4i8S6Xm8jZSJAkSZxvtR7Xe5ZqNIXdfiY/CtxewHE2Imoml7T9iuiU+2a4f3yE2ugUAOp/C4+Ec/CZVfaUKKiE4WcFnYYbshsq2/ptc2y7PWc1sFSptO0B3cszYmYkm+BRcAW0zw+c6AbKwYK7LZFDD5izMCQAeuHP+oiX/yl8tzrJjE9pkX3iqp7IpIFPOzPn1zN5jobibXtNsnu3RgPiRuzfIFWzAHD4ph0jrzvc+M6WMnqaeI+shSf3bXzwHXjY8DJ1NB3j6yLm+X4Rr1PKZs0aGz11cXU6a8CPCGAmQAcV0JXmwyv4cZbpbU4yYBhzGR8eE53i/jWr2GOVkaFVX01GoOssYZizFY2307OD8ykeK5wNFwFY3HCae8NlZ17PxKbj6GZh3fW6/8AGIpPWIsb68L+EGz2NxqTn3x/4CtyPpIHZKo/CfKVF2sQQL6feVTTkDRqD8J/xMWB/l/4mQddaOBEI5kUNhGIkjIyIGVkcMNaIiUSoMVQkWuTx0sBnA1WJYk8he3MC/3jvc5Ybgf1Wg9puEdiLZMfPT7QOZqtck8yZE6RcY5GYHP7yjqt0ZUQp0a5v8pJtf0lt17fcvnc6+kqbBUGAKNVFiDqDxl1BlbyPLp3Tzde3bnxCoaJ3j6Ezc3Kt6if3r6ZzHRLFRyv6AD7zd9nlvUT+5j5A/lJz56h16rtQY8z0ru9/dhQoJGNrm9siVUai/GB3hTdabM9dxYXLJhQADU2seE9rzMz2yfKmDmgcOQDZmZGUhPFcfebCApFEJLY3Drju4Z17WWBb5KdOz1mPvSoEwVGXtFlcBhidaNN1d7ls8bWA6aTR3nsjVXDo7WwWAVyoAuSWAXUnIeEx37dOfRbSgNEEMxL1UcB9VcPidLHMCysLd87WmMhlbpynCIgY0tmLlqqF2JUkHGtNnp4ieJsPKdRs1WtgV0K1EYBgHOFwCL4bjIkc5eZkTv20XE8Y9qARtm0BvnJ8LC3oRPXKe8RiCOjIxyGIXVja9g4ynlPty6nbKpGVmQHqQiBj5EeU6cueYB7Ir/8gG+WB8I5C6Tswi+9uQCSl1NsxYhWA8CvrON9km/86f2OviAP/rOw2vFjpFLfG4N/lKEm3XsidufRWN7Z0+xTbk7DzW//AFnID4j3AfU/edv7WpegDydD5hl+84dOJ6n0sPtJ17Ip1cSki+Wo8c5Zo1A5thYm17WJt4Dvj7TTxDqITcI/8h/sP1E59WxYd7qLlWAH9Jgf4i+Si/06Tpykxds2YI5stlNiLaXtmO+Z5725VsQoPhZTyNj3HI/vpNwLMC01931sSWPxLkevI+Unc/V5qzaNhhLRpzaRtIlYW0hUcKLnICQCawFzpMfaN5do2GUHvHb8ZsMl+sx32nOakHeiImRvETMoYxCMTEDKJWksMiDCgyCAWB3x2aL9bDzMtLM72iqWpKvN/oP1kI5pZY2VMVRB/UPTOV1l3dK3rDoGPpb7zXV8LPbZr0jjVkNmz7iAL2MubHXD9CDZgdQfyg6Y7Y6A+pEf+HuiuuTlsjwIZibN4TzuzTtoeQsPE3t6TQ3Y5W1sma6r/c5wD/2v4TJ2SvjBUizLkynh+YPObe5CjVkVxmGLLf5lFwR1yMvM/wAoz1fDqdzoBRQDS1x3Ekr6ESG8hiZFbJCSWPBmW2BDyBNz/ttxkNxVSaIBW2Bnpgc1puyKfEKDBuwcO9Q3RGfsW7NqZObfMbrfl9Z63ByXtKzVNpexwqAtMMMzcAs3dm3pM/8AjMC+7dAzgAIQScjoDaxvxA5W75eDFu03xN2j/cxufrM+mpNYnFkGdsFtCFCAk9bm0tkrc8LW4KjJWohluTVUlhmburIcZvr2gLzvt2sAHQaI7Dzs/wD2t4ThghJRUbATUpBWtfCfeJY2nb7tqAApgwMgBZdR279oN+K5DZ6wnXtPeyFqNS3xBGKk8GUXU+YE8r9uWR6quvxvSRqij8Li4t32FvCeob22oJTcHVkew5nJQPNxPFN+Vgz1GVrgu1jzzsD5CWMjbirFa6EfOfJ0P3ncV9rGENoUIbnkMmA/2lp5jQrsoxKbMuh6owI9DO33ZtwqorjXRhyYaju08505rNW/aGqj7M+Bg2Fk0N9HX85w9PTzPmTOqrUr06lMDMAkW4g9pb+KkeE5Sl8I/fGXogkW63CVwDo4IHebECKCdLkHQgGx5G4IPpMdTYsrq8MBttDGhHG1x3jMSeyV8aK3E69GGRHnDTz+nRzdCizmyKWNr2A0HWH2LElVVZWUsCLFSNMwcxpw8Z1G5GpbOlySGruGAGZUE4Ae78R5XMJvhroGK9umxViBmVZ8DZDrgbxlvyXc/CczP+s2NFeB2naVRcTHw4mQSr1lQXY/vpOd3hvAuenAStt+8S517hwEyK1cnITUhaJtG03yHnBppGo0iTLooCW3GW1/OX+VfWMd9P8AIPWZGP8Adj+UYv8AvOZxWt/OX+UeskN8t8g8zMfGP2DEHHOMG0N8v8i+ZhF323yL5mYWMc/rF7wc5MG+N+N8i+ZlLee8Wq4bqBhvpfj/APkoCv1EbFeXFTXWam4F7bnkoHmf0mWJr7hHZc82A8h+sz3/ACc+21RPaY8gPuYVD2aY6j0QysrWRz3j/iPzlpdUHIMfQD7mcHYqtPEzOps62wnnZQbEcjeXN1VWeoLdl0BbDe1mFsuoIJHjKqaHqfyH2lha9NWJDEuCtsFjpnnfSb4m2MdWSO33E96CNYjFiax1GN2ax65zM3lXtszr89aong1ZsX/HFMfZ/ad6VNEKLdUUXLZlhqcImVte+KrqqWVQru5Jvclyx06Y/SenXDYv3g22lRqw7v0mS7s3xMT00HkI6VMOgA8I+zX3/wBNJdrGJDZjZ6bXw8FdWJ8gZ1Wyb9oF3YsVuEUYgRfCGOv+6cONqaN/H87SaxerW3/qFvFSlFUcElnJwm/Yw6/5BfLpPNtsbMDlnOrrLTqfElzwwg384Lde56abQlWpiempxYbZ4h8OIcVGvgJqdGud2/dzUlXGbOyK7IRYpiLKqnqQFPiJueyTnA44BxbvK5/QQft9tavtLFSCMNMXHEBMX/aYe7abs5COyZEsVaxsMvHMzUueVdq/Zq42YgMoA0Cm1zYngcyR3mcxXUK7KpBCsQCDcW1GY6EQFbYRftVHOYuCdB+7ZwlXZ1TCFFgbi3UZg+X0j7aYaDZr69kepkpEIJoWdl3kaQsFurZgE2sRr5gDyhn38SLYBwv2jmL5i/DKZ9ZbjrqO+VA15x75863K2m36zEnAFNlChSQFVPhUToqm9R7lK5ADNhYgcGq18YGfBVpNOEDSXveuXK5tx/M+cxZqzrG9tm+ER6gROwHfBYi2EMQLdMr+M57bdsao2JjlwEdqgItlKNSkQdbzXMLQqrkyWz0L66SQWxAPOW1i1EkUDIR40aQ12O0bEjG4ADc7Cx7xKj7Ph+JF7wAR+k07xiZjcdclZRVOSeQkxRT5V8hLg2ZL4sAudctfCE2GnRR//IoKNkLnJDztyl1izFNdnT5F/wARCLsqfIv+ImvtNHY/wsyn+i5HlMnaayJ8LF+mGzSs7El2Wn8i/wCInJViC7EZAs1gOVzadK21MynCj3INri2fCYqborfJ5kSyJeopg5Tc3NlTvzZj9vtKqbiqnUqo8zNLZt0YRYuTbpJ1zswncgrVBhsMyWztyuPsJM7XnfIWUjM3Ofd3Qi7EnHEe8w6UlGigeEk4iX5LWa1XFqWboAba34SeJyLKjAdABNIR7zeRi21mJSfglupbOF9w/JfOXbxXg1T/AIZ+a+sR2Nz+MDuWXbxXgZ/8svq7Hy+ghaewBdHI8BLd4rwhqakasT32+0JeQvFeBS3juxKo5NwYfcTJ3bsL03cstzbCBcZg5k58MhOjvA7RTDdCNDxEurKy6yoyMBllcKwBsRndSeGUqVO2tlyXIgn4mOov0/YhNppkYlGR1sc1PUfpB7NUDKLcABbkRlHptVVr/vzj3ktpSzX4N/7fqIO86y7ESJ4zc2GjhRAQL25aXN7eF7eEwkzI5LZm7gb2nSBpy7v41yfAOQ8hGwL8o8hHDRFpzaN7tflHkJS3psymm9lF8NxkL5WP2l0GRqC+XPLzygcJUEOjXEhUS1xyJHllI0Tl3TaLBMjijYo15Fdw1QDMm0EK5b4Fv1OQjJQGrdo8z+UODH1Z6+S/gJRjm72HJcvWRRB+BB/c/wCRhyY95XO9Wo+5v8TE9BkPSERFXQARsUWKAS8UHiixQgkQMHiixQC3jXg8UWKAS8e8FiixQCXiBg8UWKMBbxXgsUWKATFHvBYosUAt4rwWKLFAJeK8HiixQB7ZQxj+oaH7GUt37seozMCEwm2l8TjgenXrNC8elXwNi4HJh9DJdzw1zZvlm1UDqykYXGoOqsD9LiZS0nIvhI5kiwHM9ZqbS4G0ut9TiU94BZe46w97y89XG7ABsiqlh4nnzhdkq3Rb6gWPeuR+kjRfKx1U4T1HA+VoGl2WZeoYdxFj9JCL2KLFAh5LFIuiYomMHiiLQrmN6Jaq45nF5iUUNjNXfqdtW5rbymS/AzUQa8UipjwO4xRYoItGxQ5DYosUDij3gFxRYoK8V4BsUWKBvFeAbFFigbxXgGxRYoG8V4BsUWKBvFeEGxRsUFeK8Lg2KLFA3ivBg2KNigrxXgwbFFigbxXgGxRYoBqgGsE208oFvFGYyidoMYVzzhcZ+9EdXDjRcNj3aX+k0qNUMoYaEXhaVRSRjF1PZcdG4+BtK7bIaDtTOaHtU25jiO/SRqJMbODwYW8RmPS8htBsVbvU+OY9RI7Qez1FmHeM5HaHxIcIubBgOosRCih5PFK2IgXIIHUHyhatN1TGQFv8IOrdwjFSasBqY61AdDKI5nWRW+uh4Wm/p4TUd+LdAflb6zEeam11HZShAN+XTOZQB0PdJmKdGyk4BDmRDSDsC0bFB4osUOQmKPigsUWKAXFFigsUWKAXFFigsUWKAXFFigsUWKAXFFigsUWOaBcUWKCxRYoBcUWKCxxYpkFxRYoLFFigFxRYoFqgEA+0coFtqgGsC+0nhKpeNimgUvFigsUWKATFHxQWKLFDQoaaYf31EBviQ5Eagj8xMfFLu6qlmZeYB8dDM0jQp7OmC6DNhkzZkHj3QQJDFcCjliJ7Q5gwVR1RiWvY5qOF+IAmdtW9HfJOyo4nMn8pJNb1rVtqCDtBBbmxa3cJh7Tthclma54DkO6DbZndRmM8zrcyvVoOlshn1mufCWrKM371hCMtfGZgVwQc89O6Hpu18yfKdJUWkW0BX2UN0MNig6zkDKU8sraKJRheK81KqBxYzNenY2nOxXS4osUUUOZYosUUUBYosUUUBi8ClTEb8Bp1iigO1UsbLoNT9obFFFAWKLFFFAWKLFFFAWKItFFDSDVgIJq5MUUAZeK8UUyFePijRQFeK8UUBXgw9zloPWKKaBLw+xPZ16giKKT8SLW9WsmLkfrlMRHGQ65xRRy3WgNoEo7TtALHoLecUUk9hPVF+gAAkErXP70iinTn0ibm+hgnuBmYopRPPW8lbnrFFA//2Q==",0:10,-0.010674400255084038
+19,https://i.ytimg.com/vi/dU2uy4oyq2w/maxresdefault.jpg,Johan Liebert and the Concept of Identity (Monster) – Anime Rants,0.5246871709823608
+20,https://static.wikia.nocookie.net/obluda/images/6/6d/Viera04.png/revision/latest/scale-to-width-down/686?cb=20130427085832,Anna (Věra Černá) | Naoki Urasawa's Monster Wiki | Fandom,0.5217224955558777
+21,https://i.ytimg.com/vi/83TWljmtG5o/maxresdefault.jpg,The Ending of Monster (Explained) #monster #anime #johanliebert - YouTube,0.518195629119873
+22,https://m.media-amazon.com/images/W/IMAGERENDERING_521856-T1/images/I/81yYYAE8kIL._SX300_.jpg,Watch Naoki Urasawa's Monster | Prime Video,0.5229196548461914
+23,https://qph.cf2.quoracdn.net/main-qimg-d6d5d6e7e743433283c87f3e7557bbdd-lq,"Who do you think is the real monster, Johan or his mother? Do you think Johan is still alive? - Quora",0.2615131735801697
+24,https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS6x__NvNeRnlgkoFz4Rlfuq3pHRVoFMlup0A&usqp=CAU,Monster' (2004) - Series on Netflix - Martin Cid Magazine,0.4679180979728699
+25,https://i.pinimg.com/736x/bc/fc/da/bcfcda7923cf13b5e95f8b1917a8c026.jpg,Pin on Anime/Manga,0.533714771270752
+26,https://m.media-amazon.com/images/W/IMAGERENDERING_521856-T1/images/I/41JBpDdZvuL._RI_.jpg,Watch Naoki Urasawa's Monster | Prime Video,0.5229196548461914
+27,https://static.tvtropes.org/pmwiki/pub/images/monster_girls_0.png,Cute Monster Girl - TV Tropes,0.4968129098415375
+28,https://img.wattpad.com/cover/150725731-288-k122349.jpg,Monster Musume: Everyday Life with Monster Girls and a Transformer - Chapter Seventeen: Meeting Centorea's Mother - Wattpad,0.4677058458328247
+29,https://i.etsystatic.com/12648903/r/il/6de2dd/3544939922/il_1080xN.3544939922_4a3l.jpg,Johan Liebert . Monster - Etsy,0.24065785109996796
+30,https://cdn.animenewsnetwork.com/thumbnails/crop900x350/video/category/488/key_art_naoki_urasawas_monster.jpg,Monster (TV) - Anime News Network,0.6446425914764404
+31,https://animerantshome.files.wordpress.com/2019/05/johan-liebert-grim.jpg,Johan Liebert and the Concept of Identity (Monster) – Anime Rants,0.5246871709823608
+32,https://static.wikia.nocookie.net/obluda/images/b/bb/A_Child%27s_View.png/revision/latest?cb=20191104033831,A Child's View | Naoki Urasawa's Monster Wiki | Fandom,0.5170736908912659
+33,https://occ-0-38-2164.1.nflxso.net/dnm/api/v6/9pS1daC2n6UGc3dUogvWIPMR_OU/AAAABeHtBA36bfG6VTigh-NPVYXTRhXsS7-4JIS4S5GuB7mUkm1hUHCB54v3p7gA3PGGFPZ3hAvw3XJ8U9ihpfVmal3qs61OQ4cb5ck9kSx3NETM2Soh8V714IJz.jpg?r=b23,Watch Monster | Netflix,0.3368139863014221
+34,https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR2a6wI7aplo_59tjzy9A5inDrAq9z9nTEISw&usqp=CAU,1:11,0.034722693264484406
+35,https://cdn.myanimelist.net/r/360x360/images/anime/10/18793.jpg?s=a48b4cbf6b0fddf121541058df8bc522,Monster - Reviews - MyAnimeList.net,0.34896376729011536
+36,https://i.ytimg.com/vi/HdQ0w1i2NOU/maxresdefault.jpg,Belen Ca. · 4:01,0.21784356236457825
+37,https://qph.cf2.quoracdn.net/main-qimg-dc0fe87b95072c0ff8c78649e01b3be6-lq,"Who do you think is the real monster, Johan or his mother? Do you think Johan is still alive? - Quora",0.2615131735801697
+38,https://upload.wikimedia.org/wikipedia/en/b/b1/Martin_Mystery_Logo.png,Martin Mystery - Wikipedia,0.34868139028549194
+39,https://static1.cbrimages.com/wordpress/wp-content/uploads/2019/09/Martin-Mystery-Feature.jpg,Remembering Martin Mystery and the Franchise's Start in Comics,0.42151206731796265
+40,https://variety.com/wp-content/uploads/2022/01/Poupelle-of-Chimney-Town.jpg,Poupelle of Chimney Town' Review: Believe-in-Yourself Anime for Kids - Variety,0.47964614629745483
+41,https://thescriptlab.com/wp-content/uploads/2022/10/25-of-the-Highest-Rated-Anime-Shows-and-Movies-on-Rotten-Tomatoes.jpg,25 of the Highest-Rated Anime Shows and Movies on Rotten Tomatoes - The Script Lab,0.2395673543214798
+42,https://i.pinimg.com/originals/1b/54/5c/1b545c9cbcfe3d7f1bd14936d05cbc57.png,Pin on Monster (anime),0.7174674272537231
+43,https://www.animenewsnetwork.com/thumbnails/max600x600/cms/feature/39939/act.jpg,Theron Martin - The Spring 2011 Anime Preview Guide - Anime News Network,0.6049940586090088
+44,http://pm1.narvii.com/6325/67b04933b923cfa601d4476b872215eb366302f8_00.jpg,Johan Liebert | Wiki | Anime Amino,0.387943834066391
+45,https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ8RRwtW48EjqlGf6pc26MczQqxK7d-xZiGzg&usqp=CAU,Naoki Urasawa's Monster Part 1 (Anime) Review,0.6171832084655762
+46,https://assets-prd.ignimgs.com/2022/06/27/godzilla-slideshow-cover-1656366256858.jpg,Godzilla Movies in Order: By Release Date and Series Overview - IGN,0.30148881673812866
+47,https://animehunch.com/wp-content/uploads/2020/10/Johan-Liebert-e1602481596904.jpg,What Were Johan Liebert's Motives In Monster? - Animehunch,0.4185639023780823
+48,"https://m.media-amazon.com/images/M/MV5BNjRiNmNjMmMtN2U2Yi00ODgxLTk3OTMtMmI1MTI1NjYyZTEzXkEyXkFqcGdeQXVyNjAwNDUxODI@._V1_QL75_UX140_CR0,1,140,207_.jpg",Monster (TV Series 2004–2005) - IMDb,0.46637311577796936
+49,https://i0.wp.com/www.crymore.net/wp-content/uploads/2013/02/jpegs-artifacted.jpg?fit=1134%2C640&ssl=1,Monster sucks: a message to its “fans” – Crymore.net,0.3304205536842346
+50,https://preview.redd.it/ewe3x392uk461.jpg?auto=webp&s=70b9b99c2b22e1079a7f061ea0baa0dd14d9914f,"Martin Scorsese and Robert De Niro with Catherine Scorsese; martins mother, on the set of Taxi Driver : r/Moviesinthemaking",0.405434250831604
+51,https://www.thewrap.com/wp-content/uploads/2021/09/Inu-Oh-Film-Still-2-1.jpg,Inu-Oh' Film Review: Feudal Anime Mixes Headbanging Pyrotechnics and Political Defiance,0.5606741905212402
+52,https://pic-bstarstatic.akamaized.net/ugc/ea95b9285df368e664f4e8c468e04452.jpg@720w_405h_1e_1c_90q,Monster Episode 59 - Bilibili,0.2809431850910187
+53,https://i0.wp.com/bloody-disgusting.com/wp-content/uploads/2023/01/Junji-Ito-Maniac-Hanging-Balloon.jpg?fit=1920%2C1080&ssl=1,Junji Ito Maniac: Japanese Tales of the Macabre' Review - Netflix Anime Pales in Comparison to Source Material - Bloody Disgusting,0.5567925572395325
+54,https://static01.nyt.com/images/2022/03/09/arts/turningred1/turningred1-videoSixteenByNine3000.jpg?year=2022&h=1687&w=3000&s=ee1a1f8f1d32585119ae304bba1bc12f1ea85a85f52d4dc5814f554a625c42e5&k=ZQJBKqZ0VN&tw=1,Turning Red' Review: Beware the Red-Furred Monster - The New York Times,0.23197099566459656
+55,https://image-pastemagazine-com-public-bucket.storage.googleapis.com/wp-content/uploads/2022/06/21060510/monsters-inc-header.jpg,"Monsters, Inc., My Mom and Me: Pixar's Unexpectedly Touching Comedy",0.34688839316368103
+56,https://static.wikia.nocookie.net/obluda/images/f/f1/Eva-0.png/revision/latest/thumbnail/width/360/height/360?cb=20200530235259,Eva Heinemann | Naoki Urasawa's Monster Wiki | Fandom,0.5228882431983948
+57,https://qph.fs.quoracdn.net/main-qimg-a15c08723f55903b2b60613484a2fa1d.webp,Johan Liebert and the Concept of Identity (Monster) – Anime Rants,0.5246871709823608
+58,https://qph.cf2.quoracdn.net/main-qimg-fa9a4143749df5e4e34a11cb7023cf78-lq,"Who do you think is the real monster, Johan or his mother? Do you think Johan is still alive? - Quora",0.2615131735801697
+59,https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTHAEj4xcqS3--AIslzq1xftEsRp3ccBIE6jQ&usqp=CAU,0:14,0.10984727740287781
+60,https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTMvl1NPjjLLt6gdjXBhFxRmxOaryjEELFFIw&usqp=CAU,Agustina San Martin Talks Cannes Special Mention Winner 'Monster God' - Variety,0.4072740972042084
+61,https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQK2hlx-xuQzU29BIW7mVVBOGh0A-gJ3FJI1Q&usqp=CAU,Watch Monster | Netflix,0.3368139863014221
+62,https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTVPq3_NX3CtHPR4zknCMYmnjjpiMrgZLRU3g&usqp=CAU,What's Kabbalah doing in 'Evangelion?',0.059780851006507874
+63,https://decider.com/wp-content/uploads/2022/12/Every-Show-Canceled-By-Netflix.jpg?quality=80&strip=all,Every Netflix Original Show That Has Been Canceled So Far,0.1554039716720581
+64,https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRE06FTG-sJ4EJ30mYHIPNxUxodCPi_dKUjzA&usqp=CAU,"Mothra | Wikizilla, the kaiju encyclopedia",0.350231796503067
+65,https://media.npr.org/assets/img/2018/08/09/hsieh_angela_npr_horrorreaderspoll2_3000w_wide-7a78734240d644f40cba014158ca3d362257da46-s1400-c100.jpg,100 Best Horror Novels And Stories : NPR,0.1906786412000656
+66,https://upload.wikimedia.org/wikipedia/en/3/32/Rosario_%2B_Vampire_Cast.PNG,List of Rosario + Vampire characters - Wikipedia,0.1688837707042694
+67,https://static1.cbrimages.com/wordpress/wp-content/uploads/2022/12/35-best-manga-of-all-time.jpg,45 Best Manga Of All Time,0.3924054205417633
+68,https://i.guim.co.uk/img/media/ddb39ce32c33fdfa51097dc9187afd588ec78cef/34_0_1990_1194/master/1990.jpg?width=1200&height=630&quality=85&auto=format&fit=crop&overlay-align=bottom%2Cleft&overlay-width=100p&overlay-base64=L2ltZy9zdGF0aWMvb3ZlcmxheXMvdGctZGVmYXVsdC5wbmc&s=30dbd1ed562498b45aeb946dc5fe2c39,Muppet power! RSC uses puppet legends for My Neighbour Totoro extravaganza | Stage | The Guardian,0.34219127893447876
+69,,,0.0
+70,,,0.0
+71,,,0.0
+72,,,0.0
+73,,,0.0
+74,,,0.0
+75,,,0.0
+76,,,0.0
+77,,,0.0
+78,,,0.0
+79,,,0.0
+80,,,0.0
+81,,,0.0
+82,,,0.0
+83,,,0.0
+84,,,0.0
+85,,,0.0
+86,,,0.0
+87,,,0.0
+88,,,0.0
+89,,,0.0
+90,,,0.0
+91,,,0.0
+92,,,0.0
+93,,,0.0
+94,,,0.0
+95,,,0.0
+96,,,0.0
+97,,,0.0
+98,,,0.0
+99,,,0.0
+100,,,0.0
+101,,,0.0
+102,,,0.0
+103,,,0.0
+104,,,0.0
+105,,,0.0
+106,,,0.0
+107,,,0.0
+108,,,0.0
+109,,,0.0
+110,,,0.0
+111,,,0.0
+112,,,0.0
+113,,,0.0
+114,,,0.0
+115,,,0.0
+116,,,0.0
+117,,,0.0
+118,,,0.0
+119,,,0.0
+120,,,0.0
+121,,,0.0
+122,,,0.0
+123,,,0.0
+124,,,0.0
+125,,,0.0
+126,,,0.0
+127,,,0.0
+128,,,0.0
+129,,,0.0
+130,,,0.0
+131,,,0.0
+132,,,0.0
+133,,,0.0
+134,,,0.0
+135,,,0.0
+136,,,0.0
+137,,,0.0
+138,,,0.0
+139,,,0.0
+140,,,0.0
+141,,,0.0
+142,,,0.0
+143,,,0.0
+144,,,0.0
+145,,,0.0
+146,,,0.0
+147,,,0.0
+148,,,0.0
+149,,,0.0
+150,,,0.0
+151,,,0.0
+152,,,0.0
+153,,,0.0
+154,,,0.0
+155,,,0.0
+156,,,0.0
+157,,,0.0
+158,,,0.0
+159,,,0.0
+160,,,0.0
+161,,,0.0
+162,,,0.0
+163,,,0.0
+164,,,0.0
+165,,,0.0
+166,,,0.0
+167,,,0.0
+168,,,0.0
+169,,,0.0
+170,,,0.0
+171,,,0.0
+172,,,0.0
+173,,,0.0
+174,,,0.0
+175,,,0.0
+176,,,0.0
+177,,,0.0
+178,,,0.0
+179,,,0.0
+180,,,0.0
+181,,,0.0
+182,,,0.0
+183,,,0.0
+184,,,0.0
+185,,,0.0
+186,,,0.0
+187,,,0.0
+188,,,0.0
+189,,,0.0
+190,,,0.0
+191,,,0.0
+192,,,0.0
+193,,,0.0
+194,,,0.0
+195,,,0.0
+196,,,0.0
+197,,,0.0
+198,,,0.0
+199,,,0.0
+200,,,0.0
+201,,,0.0
+202,,,0.0
+203,,,0.0
+204,,,0.0
+205,,,0.0
+206,,,0.0
+207,,,0.0
+208,,,0.0
+209,,,0.0
+210,,,0.0
+211,,,0.0
+212,,,0.0
+213,,,0.0
+214,,,0.0
+215,,,0.0
+216,,,0.0
+217,,,0.0
+218,,,0.0
+219,,,0.0
+220,,,0.0
+221,,,0.0
+222,,,0.0
+223,,,0.0
+224,,,0.0
+225,,,0.0
+226,,,0.0
+227,,,0.0
+228,,,0.0
+229,,,0.0
+230,,,0.0
+231,,,0.0
+232,,,0.0
+233,,,0.0
+234,,,0.0
+235,,,0.0
+236,,,0.0
+237,,,0.0
+238,,,0.0
+239,,,0.0
+240,,,0.0
+241,,,0.0
+242,,,0.0
+243,,,0.0
+244,,,0.0
+245,,,0.0
+246,,,0.0
+247,,,0.0
+248,,,0.0
+249,,,0.0
+250,,,0.0
+251,,,0.0
+252,,,0.0
+253,,,0.0
+254,,,0.0
+255,,,0.0
+256,,,0.0
+257,,,0.0
+258,,,0.0
+259,,,0.0
+260,,,0.0
+261,,,0.0
+262,,,0.0
+263,,,0.0
+264,,,0.0
+265,,,0.0
+266,,,0.0
+267,,,0.0
+268,,,0.0
+269,,,0.0
+270,,,0.0
+271,,,0.0
+272,,,0.0
+273,,,0.0
+274,,,0.0
+275,,,0.0
+276,,,0.0
+277,,,0.0
+278,,,0.0
+279,,,0.0
+280,,,0.0
+281,,,0.0
+282,,,0.0
+283,,,0.0
+284,,,0.0
+285,,,0.0
+286,,,0.0
+287,,,0.0
+288,,,0.0
+289,,,0.0
+290,,,0.0
+291,,,0.0
+292,,,0.0
+293,,,0.0
+294,,,0.0
+295,,,0.0
+296,,,0.0
+297,,,0.0
+298,,,0.0
+299,,,0.0
+300,,,0.0
+301,,,0.0
+302,,,0.0
+303,,,0.0
+304,,,0.0
+305,,,0.0
+306,,,0.0
+307,,,0.0
+308,,,0.0
+309,,,0.0
+310,,,0.0
+311,,,0.0
+312,,,0.0
+313,,,0.0
+314,,,0.0
+315,,,0.0
+316,,,0.0
+317,,,0.0
+318,,,0.0
+319,,,0.0
+320,,,0.0
+321,,,0.0
+322,,,0.0
+323,,,0.0
+324,,,0.0
+325,,,0.0
+326,,,0.0
+327,,,0.0
+328,,,0.0
+329,,,0.0
+330,,,0.0
+331,,,0.0
+332,,,0.0
+333,,,0.0
+334,,,0.0
+335,,,0.0
+336,,,0.0
+337,,,0.0
+338,,,0.0
+339,,,0.0
+340,,,0.0
+341,,,0.0
+342,,,0.0
+343,,,0.0
+344,,,0.0
+345,,,0.0
+346,,,0.0
+347,,,0.0
+348,,,0.0
+349,,,0.0
+350,,,0.0
+351,,,0.0
+352,,,0.0
+353,,,0.0
+354,,,0.0
+355,,,0.0
+356,,,0.0
+357,,,0.0
+358,,,0.0
+359,,,0.0
+360,,,0.0
+361,,,0.0
+362,,,0.0
+363,,,0.0
+364,,,0.0
+365,,,0.0
+366,,,0.0
+367,,,0.0
+368,,,0.0
+369,,,0.0
+370,,,0.0
+371,,,0.0
+372,,,0.0
+373,,,0.0
+374,,,0.0
+375,,,0.0
+376,,,0.0
+377,,,0.0
+378,,,0.0
+379,,,0.0
+380,,,0.0
+381,,,0.0
+382,,,0.0
+383,,,0.0
+384,,,0.0
+385,,,0.0
+386,,,0.0
+387,,,0.0
+388,,,0.0
+389,,,0.0
+390,,,0.0
+391,,,0.0
+392,,,0.0
+393,,,0.0
+394,,,0.0
+395,,,0.0
+396,,,0.0
+397,,,0.0
+398,,,0.0
+399,,,0.0
+400,,,0.0
+401,,,0.0
+402,,,0.0
+403,,,0.0
+404,,,0.0
+405,,,0.0
+406,,,0.0
+407,,,0.0
+408,,,0.0
+409,,,0.0
+410,,,0.0
+411,,,0.0
+412,,,0.0
+413,,,0.0
+414,,,0.0
+415,,,0.0
+416,,,0.0
+417,,,0.0
+418,,,0.0
+419,,,0.0
+420,,,0.0
+421,,,0.0
+422,,,0.0
+423,,,0.0
+424,,,0.0
+425,,,0.0
+426,,,0.0
+427,,,0.0
+428,,,0.0
+429,,,0.0
+430,,,0.0
+431,,,0.0
+432,,,0.0
+433,,,0.0
+434,,,0.0
+435,,,0.0
+436,,,0.0
+437,,,0.0
+438,,,0.0
+439,,,0.0
+440,,,0.0
+441,,,0.0
+442,,,0.0
+443,,,0.0
+444,,,0.0
+445,,,0.0
+446,,,0.0
+447,,,0.0
+448,,,0.0
+449,,,0.0
+450,,,0.0
+451,,,0.0
+452,,,0.0
+453,,,0.0
+454,,,0.0
+455,,,0.0
+456,,,0.0
+457,,,0.0
+458,,,0.0
+459,,,0.0
+460,,,0.0
+461,,,0.0
+462,,,0.0
+463,,,0.0
+464,,,0.0
+465,,,0.0
+466,,,0.0
+467,,,0.0
+468,,,0.0
+469,,,0.0
+470,,,0.0
+471,,,0.0
+472,,,0.0
+473,,,0.0
+474,,,0.0
+475,,,0.0
+476,,,0.0
+477,,,0.0
+478,,,0.0
+479,,,0.0
+480,,,0.0
+481,,,0.0
+482,,,0.0
+483,,,0.0
+484,,,0.0
+485,,,0.0
+486,,,0.0
+487,,,0.0
+488,,,0.0
+489,,,0.0
+490,,,0.0
+491,,,0.0
+492,,,0.0
+493,,,0.0
+494,,,0.0
+495,,,0.0
+496,,,0.0
+497,,,0.0
+498,,,0.0
+499,,,0.0
