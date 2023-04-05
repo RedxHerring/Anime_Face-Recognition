@@ -15,8 +15,7 @@ import argparse
 
 
 def worker_thread(search_key,token_name):
-    image_scraper = GoogleImageScraper(
-        webdriver_path, images_path, search_key, number_of_images, token_name, headless, min_resolution, max_resolution, max_missed)
+    image_scraper = GoogleImageScraper(images_path, search_key, number_of_images, token_name, headless, min_resolution, max_resolution, max_missed)
     image_urls = image_scraper.find_image_urls()
     image_scraper.save_images(image_urls, keep_filenames)
 
@@ -45,10 +44,6 @@ def parallel_worker_threads(search_keys=['cat'],token_names=['image'],imgs_path=
     max_resolution = max_res
     global headless
     headless = isheadless
-
-    # Define webdriver path for Selenium
-    global webdriver_path
-    webdriver_path = os.path.normpath(os.path.join(os.getcwd(), 'webdriver', webdriver_executable()))
 
     number_of_workers = len(search_keys) # Number of "workers" used
     if len(token_names) != number_of_workers:

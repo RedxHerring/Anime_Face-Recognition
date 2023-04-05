@@ -31,7 +31,7 @@ from itertools import compress
 import patch
 
 class GoogleImageScraper():
-    def __init__(self, webdriver_path, image_path, search_key="cat", number_of_images=1, token_name="cat", headless=True, min_resolution=(0, 0), max_resolution=(1920, 1080), max_missed=10):
+    def __init__(self, image_path, search_key="cat", number_of_images=1, token_name="cat", headless=True, min_resolution=(0, 0), max_resolution=(1920, 1080), max_missed=10):
         #check parameter types
         if (type(number_of_images)!=int):
             print("[Error] Number of images must be integer value.")
@@ -39,13 +39,7 @@ class GoogleImageScraper():
         if not os.path.exists(image_path):
             print("[INFO] Image path not found. Creating a new folder.")
             os.makedirs(image_path)
-            
-        #check if chromedriver is installed
-        if (not os.path.isfile(webdriver_path)):
-            is_patched = patch.download_lastest_chromedriver()
-            if (not is_patched):
-                exit("[ERR] Please update the chromedriver.exe in the webdriver folder according to your chrome version:https://chromedriver.chromium.org/downloads")
-
+        
         for i in range(1):
             try:
                 #try going to www.google.com
@@ -67,7 +61,6 @@ class GoogleImageScraper():
         self.search_key = search_key
         self.token_name = token_name
         self.number_of_images = number_of_images
-        self.webdriver_path = webdriver_path
         self.image_path = image_path
         self.url = "https://www.google.com/search?q=%s&source=lnms&tbm=isch&sa=X&ved=2ahUKEwie44_AnqLpAhUhBWMBHUFGD90Q_AUoAXoECBUQAw&biw=1920&bih=947"%(search_key)
         self.headless=headless

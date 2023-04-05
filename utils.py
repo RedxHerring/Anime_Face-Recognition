@@ -154,33 +154,6 @@ def get_character_images(anime_file,images_path=''):
         token_names = [s.replace(" ","_") for s in character_names]
         parallel_worker_threads(search_keys,token_names=token_names,imgs_path=image_path,num_images=500,maxmissed=1000)
 
-
-class dwebpException(Exception):
-    pass
-
-
-def dwebp(file: str):
-    webp = subprocess.run(
-        f"dwebp {file} -quiet -o -", shell=True, capture_output=True
-    )
-    if webp.returncode != 0:
-        raise dwebpException(webp.stderr.decode())
-    else:
-        return Image.open(BytesIO(webp.stdout))
-
-# This function loads in images of multiple different types
-def load_image(image_path):
-    if image_path[0] != '/':
-        image_path = os.path.normpath(os.path.join(os.getcwd(),image_path))
-    try:
-        img = Image.open(image_path)
-    except UnidentifiedImageError:
-        if os.path.splitext(image_path)[1].lower() == ".webp":
-            img = dwebp(image_path)
-        else:
-            raise
-    return img
-
 def isgray(imgpath):
     img = cv2.imread(imgpath)
     if len(img.shape) < 3: return True
@@ -188,7 +161,7 @@ def isgray(imgpath):
     b,g,r = img[:,:,0], img[:,:,1], img[:,:,2]
     if (b==g).all() and (b==r).all(): return True
     return False
-    
+
 def remove_grayscale_images(anime_file,images_path=''):
     if images_path[0] != '/':
         images_path = os.path.normpath(os.path.join(os.getcwd(),images_path))
@@ -197,13 +170,16 @@ def remove_grayscale_images(anime_file,images_path=''):
         image_path = os.path.join(images_path,df.Name[idx].replace(" ","_"))
         for file in os.listdir(image_path):
             if file.endswith(".png") or file.endswith(".jpg") or file.endswith(".jpeg") or file.endswith(".webp"):
-                img = load_image(os.path.join(image_path,file))
+                full_name = os.path.join(image_path,file)
+                if isgray(full_name):
+                    os.remove(full_name)
+
 
 
 
 if __name__ == '__main__':
     # list_anime_characters('Monster','Images/original-images')
-    # get_character_images("Monster-Characters.csv",'Images/google-images')
+    get_character_images("Monster-Characters.csv",'Images/google-images')
     # load_image('Images/google-images/Adolf_Junkers/Adolf_Junkers_0.webp')
-    remove_grayscale_images("Monster-Characters.csv",'Images/google-images')
+    # remove_grayscale_images("Monster-Characters.csv",'Images/google-images')
 
