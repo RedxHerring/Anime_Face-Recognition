@@ -134,6 +134,7 @@ class GoogleImageScraper():
         sim_thresh = .5
         idx = 0
         winlen = min(25,Le)
+        side_img_class_name = 'pT0Scc'
         while idx < Le:
             nfails = 0
             while nfails < 3:
@@ -143,9 +144,9 @@ class GoogleImageScraper():
                     WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, "l39u4d")))
                     side_bar = self.driver.find_element(By.CLASS_NAME,'l39u4d')
                     try:
-                        dfimg.at[idx,'url'] = side_bar.find_element(By.CLASS_NAME,'n3VNCb.pT0Scc.KAlRDb').get_attribute('src')
+                        dfimg.at[idx,'url'] = side_bar.find_element(By.CLASS_NAME,side_img_class_name).get_attribute('src')
                     except:
-                        dfimg.at[idx,'url'] = side_bar.find_element(By.CLASS_NAME,'n3VNCb.pT0Scc').get_attribute('src')
+                        dfimg.at[idx,'url'] = side_bar.find_element(By.CLASS_NAME,side_img_class_name).get_attribute('src')
                     print(f"[INFO] {self.search_key} \t #{idx} \t {dfimg['url'][idx]}")
                     dfimg.at[idx,'title'] = side_bar.text.split('\n')[1]
                     if len(dfimg['title'][idx]) == 0:
