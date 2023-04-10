@@ -172,13 +172,7 @@ def is_gray(imgpath):
 def check_gray(dir):
     for img in os.listdir(dir):
         try:
-            if(is_gray(dir + img)):
-                # print(img + ': ' + str(is_gray(dir + img)))
-                pass
-            else:
-                print(img)
-                cv2.imshow('test', cv2.imread(dir + img))
-                cv2.waitKey()
+            print(img + ': ' + str(is_gray(dir + img)))
         except:
             pass
 
