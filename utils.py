@@ -16,6 +16,7 @@ import pandas as pd
 import wget
 from runGoogleImagScraper import parallel_worker_threads
 import glob
+from anime_face_detector import create_detector
 
 # Function to return boolean True if image is black&white, and False otherwise
 def is_black_n_white(img):
@@ -188,6 +189,10 @@ def remove_grayscale_images(anime_file,images_path=''):
                 if is_gray(full_name):
                     os.remove(full_name)
 
+def crop_faces(img):
+    detector = create_detector('yolov3')
+    preds = detector(image)
+    print(preds[0])
 
 
 
@@ -196,4 +201,6 @@ if __name__ == '__main__':
     # get_character_images("Monster-Characters.csv",'Images/google-images')
     # load_image('Images/google-images/Adolf_Junkers/Adolf_Junkers_0.webp')
     # remove_grayscale_images("Monster-Characters.csv",'Images/google-images')
-    check_gray('Images/google-images/Anna_Liebert/')
+    # check_gray('Images/google-images/Anna_Liebert/')
+    image = cv2.imread('Images/google-images/Adolf_Junkers/Adolf_Junkers_0.webp')
+    crop_faces(image)

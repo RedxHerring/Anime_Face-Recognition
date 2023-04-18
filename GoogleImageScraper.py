@@ -68,6 +68,7 @@ class GoogleImageScraper():
         self.max_resolution = max_resolution
         self.max_missed = max_missed
 
+    # Load or reload full page
     def loadnscroll(self,class_name):
         print(f"[INFO] Loading {self.url}")
         max_wait_time = 5 # time to wait for images to load, in seconds
@@ -106,6 +107,7 @@ class GoogleImageScraper():
         self.driver.execute_script("window.scrollTo(0,0)") # scroll back to top
         return elems
 
+    # Find links to google images in search results 
     def find_image_urls(self):
         """
             This function search and return a list of image urls based on the search key.
@@ -135,6 +137,8 @@ class GoogleImageScraper():
         idx = 0
         winlen = min(25,Le)
         side_img_class_name = 'pT0Scc'
+        nskips = 0
+        have_reloaded = False
         while idx < Le:
             nfails = 0
             while nfails < 3:
@@ -165,10 +169,19 @@ class GoogleImageScraper():
                 except: 
                     nfails += 1
             idx += 1
+            if nfails > 3:
+                nskips += 1
+            if nskips > 3: # something wrong, reload page
+                print ('[NOTICE] Reloading due to consecutive fails')
+                elems = self.loadnscroll("rg_i.Q4LuWd") # load as much of the page as possible
+                idx = idx - nskips
+                nskips = 0 # reset
         simoothed = np.convolve(dfimg['similarity'][0:idx], np.ones(winlen), 'same') / winlen
         self.driver.quit()
         dfimg.to_csv(os.path.join(self.image_path,self.token_name+'-results.csv'))
-        image_urls = list(compress(dfimg['url'].to_list(),dfimg["similarity"]>sim_thresh))
+        # Keep all links that are above the threshold or are surrounded by links above the threshold, except for 0s removed due to content words
+        keep_rows = np.logical_and(np.logical_or(dfimg["similarity"]>sim_thresh, simoothed>sim_thresh), dfimg["similarity"]>0)
+        image_urls = list(compress(dfimg['url'].to_list(),keep_rows))
         print("[INFO] Google search ended")
         return list(set(image_urls)) # sets remove any duplicates
 
