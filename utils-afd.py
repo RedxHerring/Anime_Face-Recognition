@@ -47,6 +47,7 @@ def visualize_box(image,
                   box_color=(0, 255, 0),
                   text_color=(255, 255, 255),
                   show_box_score=True):
+
     cv2.rectangle(image, tuple(box[:2]), tuple(box[2:]), box_color, lt)
     if not show_box_score:
         return
@@ -84,6 +85,20 @@ def visualize_contour(image, pts, lt, skip_contour_with_low_score,
             draw_polyline(image, pts[indices], color, closed, lt,
                           skip_contour_with_low_score, score_threshold)
 
+def box_score(pred: np.ndarray,image: np.ndarray):
+    box = pred['bbox']
+    box, score = box[:4], box[4]
+    box = np.round(box).astype(int)
+    if box[0] < 0: # x1 is too small
+        box[0] = 0
+    if box[1] < 0: # y1 too small
+        box[1] = 0
+    ylim,xlim,n = image.shape
+    if box[2] > xlim:
+        box[2] = xlim
+    if box[3] > ylim:
+        box[3] = ylim
+    return box, score
 
 def visualize(image: np.ndarray,
               preds: np.ndarray,
@@ -95,9 +110,7 @@ def visualize(image: np.ndarray,
     res = image.copy()
 
     for pred in preds:
-        box = pred['bbox']
-        box, score = box[:4], box[4]
-        box = np.round(box).astype(int)
+        box,score = box_score(pred,image)
         pred_pts = pred['keypoints']
 
         # line_thickness
@@ -115,20 +128,32 @@ def visualize(image: np.ndarray,
 
     return res
 
+def crop_faces(image: np.ndarray,
+              preds: np.ndarray,
+              face_score_threshold: float):
+    cropped_images = [] # list of ndarrays
+    for pred in preds:
+        box, score = box_score(pred,image)
+        if score > face_score_threshold:
+            cropped_images.append(image[box[1]:box[3],box[0]:box[2],:])
+    return cropped_images
+
+
 if __name__ == "__main__":
     device = 'cpu'  #@param ['cuda:0', 'cpu']
     model = 'yolov3'  #@param ['yolov3', 'faster-rcnn']
-    detector = anime_face_detector.create_detector(model, device=device)
+    detector = anime_face_detector.create_detector(model, device=device, box_scale_factor=1.1)
 
     #@title Visualization Arguments
 
-    face_score_threshold = 0.5  #@param {type: 'slider', min: 0, max: 1, step:0.1}
-    landmark_score_threshold = 0.3  #@param {type: 'slider', min: 0, max: 1, step:0.1}
+    face_score_threshold = 0.1  #@param {type: 'slider', min: 0, max: 1, step:0.1}
+    landmark_score_threshold = 0.1  #@param {type: 'slider', min: 0, max: 1, step:0.1}
     show_box_score = True  #@param {'type': 'boolean'}
     draw_contour = True  #@param {'type': 'boolean'}
     skip_contour_with_low_score = True  #@param {'type': 'boolean'}
 
-    image = cv2.imread('Images/google-images/Adolf_Junkers/Adolf_Junkers_39.jpeg')
+    image = cv2.imread('Images/google-images/Adolf_Junkers/Adolf_Junkers_91.jpeg')
+    # image = cv2.imread('Images/original-images/Adolf_Junkers/294002.jpg')
     preds = detector(image)
     res = visualize(image, preds, face_score_threshold, landmark_score_threshold,
                 show_box_score, draw_contour, skip_contour_with_low_score)
@@ -137,3 +162,7 @@ if __name__ == "__main__":
     plt.imshow(res[:, :, ::-1])
     plt.axis('off')
     plt.show()
+
+    cropped_images = crop_faces(image,preds,.01)
+    for idx in range(len(cropped_images)):
+        cv2.imwrite('test'+str(idx)+'.png',cropped_images[idx])
