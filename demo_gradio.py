@@ -50,7 +50,7 @@ def main():
                         choices=['yolov3', 'faster-rcnn'])
     parser.add_argument('--device',
                         type=str,
-                        default='cuda:0',
+                        default='cpu',
                         choices=['cuda:0', 'cpu'])
     parser.add_argument('--face-score-threshold', type=float, default=0.5)
     parser.add_argument('--landmark-score-threshold', type=float, default=0.3)
