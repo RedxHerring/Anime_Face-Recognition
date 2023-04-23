@@ -171,11 +171,12 @@ class GoogleImageScraper():
             idx += 1
             if nfails > 3:
                 nskips += 1
-            if nskips > 3: # something wrong, reload page
+            if nskips > 3 and not have_reloaded: # something wrong, reload page
                 print ('[NOTICE] Reloading due to consecutive fails')
                 elems = self.loadnscroll("rg_i.Q4LuWd") # load as much of the page as possible
                 idx = idx - nskips
                 nskips = 0 # reset
+                have_reloaded = True # don't wanna get caught in an infinite loop
         simoothed = np.convolve(dfimg['similarity'][0:idx], np.ones(winlen), 'same') / winlen
         self.driver.quit()
         dfimg.to_csv(os.path.join(self.image_path,self.token_name+'-results.csv'))
@@ -196,7 +197,8 @@ class GoogleImageScraper():
                 google_image_scraper.save_images(image_urls)
 
         """
-        print("[INFO] Saving image, please wait...")
+        num_digits = np.ceil(np.log10(self.number_of_images))
+        print("[INFO] Saving images, please wait...")
         for indx,image_url in enumerate(image_urls):
             try:
                 print("[INFO] Image url:%s"%(image_url))
@@ -213,7 +215,9 @@ class GoogleImageScraper():
                                 #join filename and extension
                                 filename = "%s.%s"%(name,image_from_web.format.lower())
                             else:
-                                filename = "%s_%s.%s"%(self.token_name,str(indx),image_from_web.format.lower())
+                                indxstr = str(indx)
+                                indxstr = '0'*(num_digits-len(indxstr)) + indxstr
+                                filename = "%s_%s.%s"%(self.token_name,indxstr,image_from_web.format.lower())
 
                             image_path = os.path.join(self.image_path, filename)
                             print(
