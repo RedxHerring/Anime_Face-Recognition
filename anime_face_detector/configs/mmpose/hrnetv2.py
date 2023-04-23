@@ -35,7 +35,7 @@ model = dict(
     head=dict(type='RLEHead',
                        in_channels=[18, 36, 72, 144],
                        num_joints=4,
-                       loss=dict(type='JointsMSELoss',
+                       loss=dict(type='KeypointMSELoss',
                                           use_target_weight=True)),
     test_cfg=dict(flip_test=True,
                   post_process='unbiased',
