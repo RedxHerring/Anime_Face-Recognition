@@ -1,5 +1,4 @@
 # Here there will be a number of short scripts
-from PIL import Image,UnidentifiedImageError
 import numpy as np
 import time
 from selenium import webdriver
@@ -11,7 +10,6 @@ import selenium.webdriver.support.ui as UI
 import requests
 import cv2
 import os
-import platform
 import pandas as pd
 import wget
 from runGoogleImagScraper import parallel_worker_threads
@@ -149,7 +147,7 @@ def remove_grayscale_images(anime_file,images_path=''):
 def crop_faces(img_name, img=None, detector=None, cropped_dir='Images/cropped-images'):
     if detector is None:
         detector = cv2.FaceDetectorYN.create(
-            "models/face_detection_yunet_2022mar.onnx",
+            "models/fd_yunet.onnx",
             "",
             input_size=(320, 320),
             score_threshold=.3,
@@ -209,11 +207,20 @@ def crop_faces(img_name, img=None, detector=None, cropped_dir='Images/cropped-im
             cv2.imwrite(names,imgs)
     return detector # so we don't have to re-initialize next time
 
+def download_models():
+    link = 'https://github.com/opencv/opencv_zoo/raw/master/models/face_detection_yunet/face_detection_yunet_2022mar.onnx'
+    r = requests.get(link)  
+    download_path = 'models'
+    file_name = 'fd_yunet.onnx'
+    with open(os.path.join(download_path, file_name), 'wb') as fd:
+        fd.write(r.content)
+
 if __name__ == '__main__':
     # list_anime_characters('Monster','Images/original-images')
     # get_character_images("Monster-Characters.csv",'Images/google-images')
     # load_image('Images/google-images/Adolf_Junkers/Adolf_Junkers_0.webp')
     # remove_grayscale_images("Monster-Characters.csv",'Images/google-images')
     # check_gray('Images/google-images/Anna_Liebert/')
+    download_models()
     image_name = 'Images/google-images/Adolf_Junkers/Adolf_Junkers_91.jpeg'
     detector = crop_faces(image_name)

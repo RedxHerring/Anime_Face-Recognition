@@ -6,11 +6,8 @@ Created on Sun Jul 12 11:02:06 2020
 
 """
 #Import libraries
-import os
-import sys
 import concurrent.futures
 from GoogleImageScraper import GoogleImageScraper
-from patch import webdriver_executable
 import argparse
 
 
@@ -18,7 +15,6 @@ def worker_thread(search_key,token_name):
     image_scraper = GoogleImageScraper(images_path, search_key, number_of_images, token_name, headless, min_resolution, max_resolution, max_missed)
     image_urls = image_scraper.find_image_urls()
     image_scraper.save_images(image_urls, keep_filenames)
-
     #Release resources
     del image_scraper
 

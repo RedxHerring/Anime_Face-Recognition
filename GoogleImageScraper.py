@@ -14,24 +14,20 @@ from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.firefox import GeckoDriverManager
 
 #import helper libraries
-import time
 from datetime import datetime
 from urllib.parse import urlparse
 import os
 import requests
 import io
 from PIL import Image
-import re
 from sentence_transformers import SentenceTransformer
 import numpy as np
 import pandas as pd
 from itertools import compress
 
-#custom patch libraries
-import patch
 
 class GoogleImageScraper():
-    def __init__(self, image_path, search_key="cat", number_of_images=1, token_name="cat", headless=True, min_resolution=(0, 0), max_resolution=(1920, 1080), max_missed=10):
+    def __init__(self, image_path, search_key="cat", number_of_images=1, token_name="cat", driver=None, headless=True, min_resolution=(0, 0), max_resolution=(1920, 1080), max_missed=10):
         #check parameter types
         if (type(number_of_images)!=int):
             print("[Error] Number of images must be integer value.")
@@ -39,23 +35,13 @@ class GoogleImageScraper():
         if not os.path.exists(image_path):
             print("[INFO] Image path not found. Creating a new folder.")
             os.makedirs(image_path)
-        
-        for i in range(1):
-            try:
-                #try going to www.google.com
-                firefox_options = Options()
-                if headless:
-                    firefox_options.add_argument("--headless")
-                driver = webdriver.Firefox(executable_path=GeckoDriverManager().install(), options=firefox_options)
-                driver.set_window_size(1400,1050)
-                driver.get("https://www.google.com")
-            except Exception as e:
-                #update chromedriver
-                pattern = '(\d+\.\d+\.\d+\.\d+)'
-                version = list(set(re.findall(pattern, str(e))))[0]
-                is_patched = patch.download_lastest_chromedriver(version)
-                if (not is_patched):
-                    exit("[ERR] Please update the chromedriver.exe in the webdriver folder according to your chrome version:https://chromedriver.chromium.org/downloads")
+
+        if driver is None:
+            firefox_options = Options()
+            if headless:
+                firefox_options.add_argument("--headless")
+            driver = webdriver.Firefox(executable_path=GeckoDriverManager().install(), options=firefox_options)
+            driver.set_window_size(1400,1050)
 
         self.driver = driver
         self.search_key = search_key
