@@ -8,6 +8,7 @@
 *.mkv
 test.*
 *.log
+*.onnx
 __*
 __pycache__/GoogleImageScraper.cpython-37.pyc
 ghostdriver.log

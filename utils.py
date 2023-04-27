@@ -11,54 +11,11 @@ import selenium.webdriver.support.ui as UI
 import requests
 import cv2
 import os
-import io
+import platform
 import pandas as pd
 import wget
 from runGoogleImagScraper import parallel_worker_threads
-import glob
-import anime_face_detector as afd
 
-# Function to return boolean True if image is black&white, and False otherwise
-def is_black_n_white(img):
-
-
-    kernel = np.ones((2,2),np.uint8)
-
-    # load image
-
-    img = cv2.imread("2.jpg")
-
-    # Convert BGR to HSV
-
-    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-
-    # define range of black color in HSV
-
-    lower_val = np.array([0,0,0])
-
-    upper_val = np.array([179,100,130])
-
-    # Threshold the HSV image to get only black colors
-
-    mask = cv2.inRange(hsv, lower_val, upper_val)
-
-    # Bitwise-AND mask and original image
-
-    res = cv2.bitwise_and(img,img, mask= mask)
-
-    # invert the mask to get black letters on white background
-
-    res2 = cv2.bitwise_not(mask)
-
-    # display image
-
-    cv2.imshow("img", res)
-
-    cv2.imshow("img2", res2)
-
-    cv2.waitKey(0)
-
-    cv2.destroyAllWindows()
 
 def char_is_num(x):
     if(x >= '0' and x <= '9'):
@@ -189,13 +146,68 @@ def remove_grayscale_images(anime_file,images_path=''):
                 if is_gray(full_name):
                     os.remove(full_name)
 
-def crop_faces(img):
-    detector = afd.create_detector('yolov3',device='cpu')
-    preds = detector(image)
-    print(preds[0])
-    
-
-
+def crop_faces(img_name, img=None, detector=None, cropped_dir='Images/cropped-images'):
+    if detector is None:
+        detector = cv2.FaceDetectorYN.create(
+            "models/face_detection_yunet_2022mar.onnx",
+            "",
+            input_size=(320, 320),
+            score_threshold=.3,
+            nms_threshold=.4
+        )
+    if img is None: # need to load image
+        fullname, file_extension = os.path.splitext(img_name)
+        filename = os.path.basename(fullname)
+        character_name = os.path.basename(os.path.dirname(filename))
+        images_path = os.path.join(cropped_dir,character_name)
+        os.makedirs(images_path,exist_ok=True)
+        img = cv2.imread(img_name)
+    else:
+        images_path = os.path.join(cropped_dir,img_name)
+    m,n,_ = img.shape
+    detector.setInputSize((n,m))
+    faces = detector.detect(img)
+    if faces[1] is not None:
+        for idx, face in enumerate(faces[1]):
+            coords = face[:-1].astype(np.int32)
+            x1, y1, w, h = coords[0:4]
+            # First save cropped version as determined by Yunet.
+            # This way we can compare the images with other cropped ones
+            imgi = img[y1:y1+h, x1:x1+w, :]
+            namei =  os.path.join(images_path,filename+'-'+str(idx)+'.png')
+            cv2.imwrite(namei,imgi)
+            # Now get a square crop to use with CNN, which we can easily scale as needed.
+            # Start by enlarging by 10% in all directions, to get full chin and ears, and more hair.
+            ws = int(1.2*max(w,h))
+            # Expand borders in x direction
+            dw = int((ws-w)/2)
+            x1 = x1 - dw
+            if x1 < 0:
+                x1 = 0
+            x2 = x1 + ws
+            if x2 > n:
+                x2 = n
+                ws = x2 - x1 + 1 # shrink border
+            # Expand borders in y direction
+            hs = ws
+            dh = int((hs-h)/2)
+            y1 = y1 - dh
+            if y1 < 0:
+                y1 = 0
+            y2 = y1 + hs
+            if y2 > m:
+                y2 = m
+                hs = y2 - y1 + 1
+            # Now shrink x again if necessary
+            if hs < ws:
+                dw = int((ws-hs)/2)
+                ws = hs
+                x1 = x1 + dw
+                x2 = x1 + ws
+            imgs = img[y1:y1+hs, x1:x1+ws, :]
+            names =  os.path.join(images_path,filename+'-square'+str(idx)+'.png')
+            cv2.imwrite(names,imgs)
+    return detector # so we don't have to re-initialize next time
 
 if __name__ == '__main__':
     # list_anime_characters('Monster','Images/original-images')
@@ -203,5 +215,5 @@ if __name__ == '__main__':
     # load_image('Images/google-images/Adolf_Junkers/Adolf_Junkers_0.webp')
     # remove_grayscale_images("Monster-Characters.csv",'Images/google-images')
     # check_gray('Images/google-images/Anna_Liebert/')
-    image = cv2.imread('Images/google-images/Adolf_Junkers/Adolf_Junkers_5.jpeg')
-    crop_faces(image)
+    image_name = 'Images/google-images/Adolf_Junkers/Adolf_Junkers_91.jpeg'
+    detector = crop_faces(image_name)
