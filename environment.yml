@@ -1,229 +1,231 @@
-name: anime-face-recognition
+name: aniFR
 channels:
+  - pytorch
   - defaults
 dependencies:
   - _libgcc_mutex=0.1=main
   - _openmp_mutex=5.1=1_gnu
-  - appdirs=1.4.4=pyhd3eb1b0_0
-  - asttokens=2.0.5=pyhd3eb1b0_0
-  - backcall=0.2.0=pyhd3eb1b0_0
   - blas=1.0=mkl
-  - brotli=1.0.9=h5eee18b_7
-  - brotli-bin=1.0.9=h5eee18b_7
   - brotlipy=0.7.0=py310h7f8727e_1002
   - bzip2=1.0.8=h7b6447c_0
   - ca-certificates=2023.01.10=h06a4308_0
   - certifi=2022.12.7=py310h06a4308_0
   - cffi=1.15.1=py310h5eee18b_3
   - charset-normalizer=2.0.4=pyhd3eb1b0_0
-  - contourpy=1.0.5=py310hdb19cb5_0
   - cryptography=39.0.1=py310h9ce1e76_0
-  - cycler=0.11.0=pyhd3eb1b0_0
-  - dbus=1.13.18=hb2f20db_0
-  - executing=0.8.3=pyhd3eb1b0_0
-  - expat=2.4.9=h6a678d5_0
-  - fontconfig=2.14.1=h52c9d5c_1
-  - fonttools=4.25.0=pyhd3eb1b0_0
+  - ffmpeg=4.3=hf484d3e_0
+  - filelock=3.9.0=py310h06a4308_0
   - freetype=2.12.1=h4a9f257_0
   - giflib=5.2.1=h5eee18b_3
-  - glib=2.69.1=he621ea3_2
-  - gst-plugins-base=1.14.1=h6a678d5_1
-  - gstreamer=1.14.1=h5eee18b_1
-  - icu=58.2=he6710b0_3
+  - gmp=6.2.1=h295c915_3
+  - gmpy2=2.1.2=py310heeb90bb_0
+  - gnutls=3.6.15=he1e5248_0
+  - idna=3.4=py310h06a4308_0
   - intel-openmp=2021.4.0=h06a4308_3561
-  - ipython=8.10.0=py310h06a4308_0
-  - jedi=0.18.1=py310h06a4308_1
+  - jinja2=3.1.2=py310h06a4308_0
   - jpeg=9e=h5eee18b_1
-  - kiwisolver=1.4.4=py310h6a678d5_0
-  - krb5=1.19.4=h568e23c_0
+  - lame=3.100=h7b6447c_0
   - lcms2=2.12=h3be6417_0
   - ld_impl_linux-64=2.38=h1181459_1
   - lerc=3.0=h295c915_0
-  - libbrotlicommon=1.0.9=h5eee18b_7
-  - libbrotlidec=1.0.9=h5eee18b_7
-  - libbrotlienc=1.0.9=h5eee18b_7
-  - libclang=10.0.1=default_hb85057a_2
   - libdeflate=1.17=h5eee18b_0
-  - libedit=3.1.20221030=h5eee18b_0
-  - libevent=2.1.12=h8f2d780_0
   - libffi=3.4.2=h6a678d5_6
   - libgcc-ng=11.2.0=h1234567_1
-  - libgfortran-ng=11.2.0=h00389a5_1
-  - libgfortran5=11.2.0=h1234567_1
   - libgomp=11.2.0=h1234567_1
-  - libllvm10=10.0.1=hbcb73fb_5
+  - libiconv=1.16=h7f8727e_2
+  - libidn2=2.3.2=h7f8727e_0
   - libpng=1.6.39=h5eee18b_0
-  - libpq=12.9=h16c4e8d_3
   - libstdcxx-ng=11.2.0=h1234567_1
+  - libtasn1=4.19.0=h5eee18b_0
   - libtiff=4.5.0=h6a678d5_2
+  - libunistring=0.9.10=h27cfd23_0
   - libuuid=1.41.5=h5eee18b_0
   - libwebp=1.2.4=h11a3e52_1
   - libwebp-base=1.2.4=h5eee18b_1
-  - libxcb=1.15=h7f8727e_0
-  - libxkbcommon=1.0.1=hfa300c1_0
-  - libxml2=2.9.14=h74e7548_0
-  - libxslt=1.1.35=h4e12654_0
   - lz4-c=1.9.4=h6a678d5_0
-  - matplotlib=3.7.1=py310h06a4308_1
-  - matplotlib-base=3.7.1=py310h1128e8f_1
-  - matplotlib-inline=0.1.6=py310h06a4308_0
+  - markupsafe=2.1.1=py310h7f8727e_0
   - mkl=2021.4.0=h06a4308_640
   - mkl-service=2.4.0=py310h7f8727e_0
   - mkl_fft=1.3.1=py310hd6ae3a3_0
   - mkl_random=1.2.2=py310h00e6091_0
-  - munkres=1.1.4=py_0
+  - mpc=1.1.0=h10f8cd9_1
+  - mpfr=4.0.2=hb69a4c5_1
   - ncurses=6.4=h6a678d5_0
-  - nspr=4.33=h295c915_0
-  - nss=3.74=h0370c37_0
+  - nettle=3.7.3=hbbd107a_1
+  - networkx=2.8.4=py310h06a4308_1
   - numpy=1.23.5=py310hd5efca6_0
   - numpy-base=1.23.5=py310h8e6c178_0
+  - openh264=2.1.1=h4ff587b_0
   - openssl=1.1.1t=h7f8727e_0
-  - packaging=23.0=py310h06a4308_0
-  - parso=0.8.3=pyhd3eb1b0_0
-  - pcre=8.45=h295c915_0
-  - pexpect=4.8.0=pyhd3eb1b0_3
-  - pickleshare=0.7.5=pyhd3eb1b0_1003
+  - pillow=9.4.0=py310h6a678d5_0
   - pip=23.0.1=py310h06a4308_0
-  - ply=3.11=py310h06a4308_0
-  - pooch=1.4.0=pyhd3eb1b0_0
-  - prompt-toolkit=3.0.36=py310h06a4308_0
-  - ptyprocess=0.7.0=pyhd3eb1b0_2
-  - pure_eval=0.2.2=pyhd3eb1b0_0
   - pycparser=2.21=pyhd3eb1b0_0
   - pyopenssl=23.0.0=py310h06a4308_0
-  - pyparsing=3.0.9=py310h06a4308_0
-  - pyqt=5.15.7=py310h6a678d5_1
   - pysocks=1.7.1=py310h06a4308_0
-  - python=3.10.9=h7a1cb2a_2
-  - python-dateutil=2.8.2=pyhd3eb1b0_0
-  - qt-main=5.15.2=h327a75a_7
-  - qt-webengine=5.15.9=hd2b0992_4
-  - qtwebkit=5.212=h4eab89a_4
+  - python=3.10.10=h7a1cb2a_2
+  - pytorch=2.0.0=py3.10_cpu_0
+  - pytorch-mutex=1.0=cpu
   - readline=8.2=h5eee18b_0
-  - scipy=1.10.0=py310hd5efca6_1
-  - setuptools=65.6.3=py310h06a4308_0
-  - sip=6.6.2=py310h6a678d5_0
+  - requests=2.28.1=py310h06a4308_1
+  - setuptools=66.0.0=py310h06a4308_0
   - six=1.16.0=pyhd3eb1b0_1
-  - sqlite=3.41.1=h5eee18b_0
-  - stack_data=0.2.0=pyhd3eb1b0_0
+  - sqlite=3.41.2=h5eee18b_0
+  - sympy=1.11.1=py310h06a4308_0
   - tk=8.6.12=h1ccaba5_0
-  - toml=0.10.2=pyhd3eb1b0_0
-  - tornado=6.2=py310h5eee18b_0
-  - traitlets=5.7.1=py310h06a4308_0
-  - tzdata=2022g=h04d1e81_0
-  - urllib3=1.26.14=py310h06a4308_0
-  - wcwidth=0.2.5=pyhd3eb1b0_0
+  - torchvision=0.15.0=py310_cpu
+  - typing_extensions=4.5.0=py310h06a4308_0
+  - urllib3=1.26.15=py310h06a4308_0
   - wheel=0.38.4=py310h06a4308_0
   - xz=5.2.10=h5eee18b_1
   - zlib=1.2.13=h5eee18b_0
-  - zstd=1.5.4=hc292b87_0
+  - zstd=1.5.5=hc292b87_0
   - pip:
+      - absl-py==1.4.0
       - addict==2.4.0
-      - anime-face-detector==0.0.9
+      - albumentations==1.3.0
+      - altair==4.2.2
+      - anyio==3.6.2
+      - astunparse==1.6.3
       - async-generator==1.10
-      - attrs==22.2.0
-      - blis==0.7.9
-      - catalogue==2.0.8
-      - chardet==4.0.0
+      - attrs==23.1.0
+      - beautifulsoup4==4.12.2
+      - blinker==1.6.2
+      - cachetools==5.3.0
       - chumpy==0.70
       - click==8.1.3
-      - cmake==3.26.0
       - colorama==0.4.6
-      - confection==0.0.4
-      - cymem==2.0.7
+      - commonmark==0.9.1
+      - contourpy==1.0.7
+      - cycler==0.11.0
       - cython==0.29.34
-      - decorator==4.4.2
+      - decorator==5.1.1
+      - depthai==2.21.2.0
+      - dlib==19.24.1
+      - entrypoints==0.4
       - exceptiongroup==1.1.1
-      - filelock==3.10.0
+      - face-recognition==1.3.0
+      - face-recognition-models==0.3.0
+      - fastapi==0.95.1
+      - flatbuffers==23.3.3
+      - fonttools==4.39.3
+      - fps==0.0.21
+      - fsspec==2023.4.0
+      - gast==0.4.0
+      - gdown==4.7.1
+      - gitdb==4.0.10
+      - gitpython==3.1.31
+      - google-auth==2.17.3
+      - google-auth-oauthlib==1.0.0
+      - google-pasta==0.2.0
+      - grpcio==1.54.0
       - h11==0.14.0
-      - huggingface-hub==0.13.3
-      - idna==2.10
-      - imageio==2.27.0
-      - imageio-ffmpeg==0.4.8
-      - jinja2==3.1.2
+      - h5py==3.8.0
+      - huggingface-hub==0.14.1
+      - iglovikov-helper-functions==0.0.53
+      - imagecorruptions==1.1.2
+      - imageio==2.28.0
+      - importlib-metadata==6.6.0
+      - jax==0.4.8
       - joblib==1.2.0
+      - jpeg4py==0.1.4
       - json-tricks==3.16.1
-      - langcodes==3.3.0
-      - lit==16.0.0
+      - jsonschema==4.17.3
+      - keras==2.12.0
+      - kiwisolver==1.4.4
+      - lazy-loader==0.2
+      - libclang==16.0.0
       - markdown==3.4.3
       - markdown-it-py==2.2.0
-      - markupsafe==2.1.2
+      - matplotlib==3.7.1
       - mdurl==0.1.2
+      - ml-dtypes==0.1.0
       - mmcv==2.0.0
-      - mmcv-full==1.6.1
-      - mmdet==2.25.1
+      - mmdet==3.0.0
       - mmengine==0.7.2
-      - mmpose==0.28.1
+      - mmpose==1.0.0
       - model-index==0.1.11
-      - moviepy==1.0.3
-      - mpmath==1.3.0
-      - murmurhash==1.0.9
-      - networkx==3.0
+      - mpmath==1.2.1
+      - munkres==1.1.4
       - nltk==3.8.1
-      - nvidia-cublas-cu11==11.10.3.66
-      - nvidia-cuda-cupti-cu11==11.7.101
-      - nvidia-cuda-nvrtc-cu11==11.7.99
-      - nvidia-cuda-runtime-cu11==11.7.99
-      - nvidia-cudnn-cu11==8.5.0.96
-      - nvidia-cufft-cu11==10.9.0.58
-      - nvidia-curand-cu11==10.2.10.91
-      - nvidia-cusolver-cu11==11.4.0.1
-      - nvidia-cusparse-cu11==11.7.4.91
-      - nvidia-nccl-cu11==2.14.3
-      - nvidia-nvtx-cu11==11.7.91
+      - oauthlib==3.2.2
       - opencv-python==4.7.0.72
       - opencv-python-headless==4.7.0.72
-      - openmim==0.2.1
+      - openmim==0.3.7
+      - opt-einsum==3.3.0
       - ordered-set==4.1.0
       - outcome==1.2.0
+      - packaging==23.1
       - pandas==1.5.3
-      - pathy==0.10.1
-      - pillow==9.0.1
-      - preshed==3.0.8
-      - proglog==0.1.10
+      - pluggy==1.0.0
+      - protobuf==3.20.3
+      - pyarrow==11.0.0
+      - pyasn1==0.5.0
+      - pyasn1-modules==0.3.0
       - pycocotools==2.0.6
-      - pydantic==1.10.6
-      - pygments==2.15.0
-      - pyqt5-sip==12.11.0
+      - pydantic==1.10.7
+      - pydeck==0.8.1b0
+      - pygments==2.15.1
+      - pympler==1.0.1
+      - pyparsing==3.0.9
+      - pyrsistent==0.19.3
+      - python-dateutil==2.8.2
       - python-dotenv==1.0.0
-      - pytz==2023.2
+      - pytz==2023.3
+      - pytz-deprecation-shim==0.1.0.post0
+      - pywavelets==1.4.1
       - pyyaml==6.0
-      - regex==2022.10.31
-      - requests==2.25.1
-      - rich==13.3.4
+      - qudida==0.0.4
+      - regex==2023.3.23
+      - requests-oauthlib==1.3.1
+      - retina-face==0.0.13
+      - retinaface-pytorch==0.0.7
+      - rich==12.6.0
+      - rsa==4.9
+      - scikit-image==0.20.0
       - scikit-learn==1.2.2
-      - selenium==4.0.0
+      - scipy==1.10.1
+      - selenium==4.9.0
       - sentence-transformers==2.2.2
-      - sentencepiece==0.1.97
+      - sentencepiece==0.1.98
       - shapely==2.0.1
-      - smart-open==6.3.0
+      - shellingham==1.5.0.post1
+      - smmap==5.0.0
       - sniffio==1.3.0
       - sortedcontainers==2.4.0
-      - spacy==3.5.1
-      - spacy-legacy==3.0.12
-      - spacy-loggers==1.0.4
-      - srsly==2.4.6
-      - sympy==1.11.1
+      - soupsieve==2.4.1
+      - starlette==0.26.1
+      - streamlit==1.21.0
       - tabulate==0.9.0
-      - termcolor==2.2.0
+      - tensorboard==2.12.2
+      - tensorboard-data-server==0.7.0
+      - tensorboard-plugin-wit==1.8.1
+      - tensorflow==2.12.0
+      - tensorflow-estimator==2.12.0
+      - tensorflow-io-gcs-filesystem==0.32.0
+      - termcolor==2.3.0
       - terminaltables==3.1.10
-      - thinc==8.1.9
       - threadpoolctl==3.1.0
-      - tokenizers==0.13.2
-      - torch==2.0.0
+      - tifffile==2023.4.12
+      - tokenizers==0.13.3
+      - toml==0.10.2
+      - tomli==2.0.1
+      - toolz==0.12.0
+      - tornado==6.3.1
       - tqdm==4.65.0
-      - transformers==4.27.2
+      - transformers==4.28.1
       - trio==0.22.0
       - trio-websocket==0.10.2
-      - triton==2.0.0
       - typer==0.7.0
-      - typing-extensions==4.5.0
-      - undetected-chromedriver==3.4.6
-      - urllib3-secure-extra==0.1.0
-      - wasabi==1.1.1
+      - tzdata==2023.3
+      - tzlocal==4.3
+      - validators==0.20.0
+      - watchdog==3.0.0
       - webdriver-manager==3.8.6
+      - werkzeug==2.2.3
       - wget==3.2
+      - wrapt==1.14.1
       - wsproto==1.2.0
       - xtcocotools==1.13
-      - yapf==0.32.0
-prefix: /home/redxarch/.conda/envs/anime-face-recognition
+      - yapf==0.33.0
+      - zipp==3.15.0
+prefix: /home/redxhat/.conda/envs/aniFR

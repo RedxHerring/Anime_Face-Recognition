@@ -7,6 +7,7 @@ pip install -U openmim
 mim install mmengine
 mim install "mmcv>=2.0.0"
 mim install mmdet
+mim install mmpose
 
 # For verification
 mim download mmdet --config rtmdet_tiny_8xb32-300e_coco --dest .
