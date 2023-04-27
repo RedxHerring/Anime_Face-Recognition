@@ -144,7 +144,7 @@ def remove_grayscale_images(anime_file,images_path=''):
                 if is_gray(full_name):
                     os.remove(full_name)
 
-def crop_faces(img_name, img=None, detector=None, cropped_dir='Images/cropped-images'):
+def crop_faces(img_name, img=None, detector=None, cropped_dir='Images/cropped-images',idx0=0):
     if detector is None:
         detector = cv2.FaceDetectorYN.create(
             "models/fd_yunet.onnx",
@@ -172,7 +172,7 @@ def crop_faces(img_name, img=None, detector=None, cropped_dir='Images/cropped-im
             # First save cropped version as determined by Yunet.
             # This way we can compare the images with other cropped ones
             imgi = img[y1:y1+h, x1:x1+w, :]
-            namei =  os.path.join(images_path,filename+'-'+str(idx)+'.png')
+            namei =  os.path.join(images_path,filename+'-'+str(idx0+idx)+'.png')
             cv2.imwrite(namei,imgi)
             # Now get a square crop to use with CNN, which we can easily scale as needed.
             # Start by enlarging by 10% in all directions, to get full chin and ears, and more hair.
@@ -203,9 +203,9 @@ def crop_faces(img_name, img=None, detector=None, cropped_dir='Images/cropped-im
                 x1 = x1 + dw
                 x2 = x1 + ws
             imgs = img[y1:y1+hs, x1:x1+ws, :]
-            names =  os.path.join(images_path,filename+'-square'+str(idx)+'.png')
+            names =  os.path.join(images_path,filename+'-square'+str(idx0+idx)+'.png')
             cv2.imwrite(names,imgs)
-    return detector # so we don't have to re-initialize next time
+    return detector, idx0+idx # so we don't have to re-initialize next time
 
 def download_models():
     link = 'https://github.com/opencv/opencv_zoo/raw/master/models/face_detection_yunet/face_detection_yunet_2022mar.onnx'
@@ -214,6 +214,11 @@ def download_models():
     file_name = 'fd_yunet.onnx'
     with open(os.path.join(download_path, file_name), 'wb') as fd:
         fd.write(r.content)
+
+def crop_faces_in_video(video_path):
+    cap = cv2.VideoCapture('linusi.mp4')
+    while(cap.isOpened()):
+        ret, frame = cap.read()
 
 if __name__ == '__main__':
     # list_anime_characters('Monster','Images/original-images')
