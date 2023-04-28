@@ -228,5 +228,5 @@ if __name__ == '__main__':
     # remove_grayscale_images("Monster-Characters.csv",'Images/google-images')
     # check_gray('Images/google-images/Anna_Liebert/')
     download_models()
-    image_name = 'Images/google-images/Adolf_Junkers/Adolf_Junkers_90.jpeg'
+    image_name = 'Images/google-images/Anna_Liebert/Anna_Liebert_90.jpeg'
     detector = crop_faces(image_name)
