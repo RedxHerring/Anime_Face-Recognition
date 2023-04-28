@@ -211,6 +211,7 @@ def download_models():
     link = 'https://github.com/opencv/opencv_zoo/raw/master/models/face_detection_yunet/face_detection_yunet_2022mar.onnx'
     r = requests.get(link)  
     download_path = 'models'
+    os.makedirs(download_path,exist_ok=True)
     file_name = 'fd_yunet.onnx'
     with open(os.path.join(download_path, file_name), 'wb') as fd:
         fd.write(r.content)
@@ -227,5 +228,5 @@ if __name__ == '__main__':
     # remove_grayscale_images("Monster-Characters.csv",'Images/google-images')
     # check_gray('Images/google-images/Anna_Liebert/')
     download_models()
-    image_name = 'Images/google-images/Adolf_Junkers/Adolf_Junkers_91.jpeg'
+    image_name = 'Images/google-images/Adolf_Junkers/Adolf_Junkers_90.jpeg'
     detector = crop_faces(image_name)
