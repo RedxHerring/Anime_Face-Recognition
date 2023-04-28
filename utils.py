@@ -12,6 +12,7 @@ import cv2
 import os
 import pandas as pd
 import wget
+import glob
 from runGoogleImagScraper import parallel_worker_threads
 
 
@@ -209,7 +210,7 @@ def crop_faces(img_name, img=None, detector=None, cropped_dir='Images/cropped-im
 
 def download_models():
     link = 'https://github.com/opencv/opencv_zoo/raw/master/models/face_detection_yunet/face_detection_yunet_2022mar.onnx'
-    r = requests.get(link)  
+    r = requests.get(link)
     download_path = 'models'
     os.makedirs(download_path,exist_ok=True)
     file_name = 'fd_yunet.onnx'
@@ -221,6 +222,17 @@ def crop_faces_in_video(video_path):
     while(cap.isOpened()):
         ret, frame = cap.read()
 
+def crop_faces_all():
+    dirs = glob.glob('Images/google-images/*')
+    for dir in dirs:
+        crop_dir = os.path.join('Images/cropped-images/',dir[7:])
+        print(crop_dir)
+        imgs = glob.glob(dir + '/*.jpeg')
+        for img in imgs:
+            print(img)
+            crop_faces(img, cropped_dir=crop_dir)
+
+
 if __name__ == '__main__':
     # list_anime_characters('Monster','Images/original-images')
     # get_character_images("Monster-Characters.csv",'Images/google-images')
@@ -228,5 +240,6 @@ if __name__ == '__main__':
     # remove_grayscale_images("Monster-Characters.csv",'Images/google-images')
     # check_gray('Images/google-images/Anna_Liebert/')
     download_models()
-    image_name = 'Images/google-images/Anna_Liebert/Anna_Liebert_90.jpeg'
-    detector = crop_faces(image_name)
+    # image_name = 'Images/google-images/Anna_Liebert/Anna_Liebert_90.jpeg'
+    # detector = crop_faces(image_name)
+    crop_faces_all()
