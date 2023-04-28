@@ -145,13 +145,20 @@ def remove_grayscale_images(anime_file,images_path=''):
                 if is_gray(full_name):
                     os.remove(full_name)
 
+def area(a, b):  # returns intersecting area >= 0
+    # From https://stackoverflow.com/questions/27152904/calculate-overlapped-area-between-two-rectangles
+    # a and b expres rectangles as a = [a_xmin, a_ymin, a_xmax, a_ymax]
+    dx =  max(min(a[2],b[2]) - max(a[0],b[0]), 0)
+    dy =  max(min(a[3],b[3]) - max(a[1],b[1]), 0)
+    return dx*dy
+
 def crop_faces(img_name, img=None, detector=None, cropped_dir='Images/cropped-images',idx0=0):
     if detector is None:
         detector = cv2.FaceDetectorYN.create(
             "models/fd_yunet.onnx",
             "",
             input_size=(320, 320),
-            score_threshold=.3,
+            score_threshold=.2,
             nms_threshold=.4
         )
     if img is None: # need to load image
@@ -166,7 +173,13 @@ def crop_faces(img_name, img=None, detector=None, cropped_dir='Images/cropped-im
     m,n,_ = img.shape
     detector.setInputSize((n,m))
     faces = detector.detect(img)
+    idx = 0 # initialize in case the for loop is skipped
     if faces[1] is not None:
+        # First we need to check for and remove cases of boxes within boxes.
+        # Setting a lower nms_threshold would remove the outer box, but if that larger box is around two smaller boxes,
+        # it likely means the larger box is detecting features from two seperate but nearby heads 
+        coords = np.array(faces[1][:,0:4])
+        areas = np.prod(coords[:,2:])
         for idx, face in enumerate(faces[1]):
             coords = face[:-1].astype(np.int32)
             x1, y1, w, h = coords[0:4]
@@ -240,6 +253,6 @@ if __name__ == '__main__':
     # remove_grayscale_images("Monster-Characters.csv",'Images/google-images')
     # check_gray('Images/google-images/Anna_Liebert/')
     download_models()
-    # image_name = 'Images/google-images/Anna_Liebert/Anna_Liebert_90.jpeg'
-    # detector = crop_faces(image_name)
-    crop_faces_all()
+    image_name = 'Images/google-images/Johan_Liebert/image.png'
+    detector = crop_faces(image_name)
+    # crop_faces_all()
