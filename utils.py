@@ -180,7 +180,7 @@ def crop_faces(img_name, img=None, detector=None, cropped_dir='Images/cropped-im
         # it likely means the larger box is detecting features from two seperate but nearby heads 
         max_overlap = .4 # max fraction of face box that can intersect another box before we have a problem
         coords = faces[1][:,0:4].astype(np.int32)
-        Nf = len(faces[1])
+        Nf = len(coords)
         if Nf > 1:
             rects = np.vstack((coords[:,0],coords[:,1],coords[:,0]+coords[:,2],coords[:,1]+coords[:,3])).T
             areas = np.prod(coords[:,2:],axis=1)
@@ -199,8 +199,9 @@ def crop_faces(img_name, img=None, detector=None, cropped_dir='Images/cropped-im
                 elif sum(ovlp_wrt_j>max_overlap) == 1:
                     keep_rect[ovlp_wrt_j>max_overlap] = False
             coords = coords[keep_rect,:]
+        Nf = len(coords)
         for idx in range(Nf):
-            x1, y1, w, h = coords[idx,0:4].astype(np.int32)
+            x1, y1, w, h = coords[idx,0:4]
             # First save cropped version as determined by Yunet.
             # This way we can compare the images with other cropped ones
             imgi = img[y1:y1+h, x1:x1+w, :]
