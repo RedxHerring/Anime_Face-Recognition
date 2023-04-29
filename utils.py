@@ -2,11 +2,14 @@
 import numpy as np
 import time
 from selenium import webdriver
-# make sure geckodriver installed in default locaiton for OS. For linux installation the package manager should do its job here.
 from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
-import selenium.webdriver.support.ui as UI
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.firefox.service import Service as FirefoxService
+from webdriver_manager.firefox import GeckoDriverManager
+
 import requests
 import cv2
 import os
@@ -14,7 +17,6 @@ import pandas as pd
 import wget
 import glob
 from runGoogleImagScraper import parallel_worker_threads
-
 
 def char_is_num(x):
     if(x >= '0' and x <= '9'):
@@ -29,10 +31,10 @@ def list_anime_characters(anime_name,images_path='',keep_filenames=False):
     os.makedirs(images_path,exist_ok=True)
     firefox_options = Options()
     firefox_options.add_argument("--headless")
-    driver = webdriver.Firefox(options=firefox_options)
+    driver = webdriver.Firefox(service=FirefoxService(GeckoDriverManager().install()),options=firefox_options)
     # Using https://stackoverflow.com/questions/63232160/cannot-locate-search-bar-with-selenium-in-python
     driver.get('https://myanimelist.net/anime.php')
-    wait = UI.WebDriverWait(driver, 3000)
+    WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "q")))
     elem = driver.find_element(By.ID,"q")
     elem.send_keys(anime_name)
     elem.send_keys(Keys.ENTER)
@@ -47,11 +49,13 @@ def list_anime_characters(anime_name,images_path='',keep_filenames=False):
             break
     driver.get(link + '/characters')
     # Now we're on the characters page for the anime we want.
-    wait = UI.WebDriverWait(driver, 3000)
+    WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, 'js-anime-character-table')))
     elem_list = driver.find_elements(By.CLASS_NAME,'js-anime-character-table')
     character_links = []
     character_names = []
+    character_types = []
     # Loop though list to get character's primary name and link to character's page
+    print('[INFO] Collecting characters')
     for elem in elem_list:
         character_name = elem.text.partition("\n")[0]
         if ',' in character_name:
@@ -68,10 +72,11 @@ def list_anime_characters(anime_name,images_path='',keep_filenames=False):
         character_names.append(character_name)
         # Use class and css to find character page link.
         link_elem = elem.find_element(By.CLASS_NAME,'spaceit_pad').find_element(By.CSS_SELECTOR,'a')
+        character_types.append(elem.find_elements(By.CLASS_NAME,'spaceit_pad')[1].text)
         character_links.append(link_elem.get_attribute('href'))
 
     # Create table with character name and links, as well as any alternative names.
-    d = {'Name': character_names, 'Other_Names': ['']*len(character_names), 'Link': character_links, 'Image_Link': character_links}
+    d = {'Name': character_names, 'Character_Type': character_types, 'Other_Names': ['']*len(character_names), 'Link': character_links, 'Image_Link': character_links}
     # Note we reused variables to initialize the table values,a nd we will modify them as we loop through
     df = pd.DataFrame(data=d)
     for chidx in range(len(character_names)): # Loop through all characters in the anime
@@ -80,17 +85,25 @@ def list_anime_characters(anime_name,images_path='',keep_filenames=False):
         image_path = os.path.join(images_path,character_name.replace(" ","_"))
         os.makedirs(image_path,exist_ok=True)
         driver.get(link)
-        time.sleep(5)
-        # Now that we're on the page, we try to get alternative character names, which will be in the title in ""
-        elem = driver.find_element(By.CLASS_NAME,'title-name.h1_bold_none')
-        names_list = elem.text.split('"')
-        if len(names_list) > 1:
-            df.Other_Names[chidx] = names_list[1]
+        cidx = 0
+        while cidx < 3:
+            try:
+                WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, 'title-name.h1_bold_none')))
+                # Now that we're on the page, we try to get alternative character names, which will be in the title in ""
+                elem = driver.find_element(By.CLASS_NAME,'title-name.h1_bold_none')
+                names_list = elem.text.split('"')
+                if len(names_list) > 1:
+                    df.Other_Names[chidx] = names_list[1]
+                break
+            except:
+                cidx += 1
         # Now we want to extract the image that comes with the character, as for minor characters we won't find one elsewhere.
+        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, 'portrait-225x350.lazyloaded')))
         elem = driver.find_element(By.CLASS_NAME,'portrait-225x350.lazyloaded') # find main character image on the page
         image_url = elem.get_attribute('src')
         df.Image_Link[chidx] = image_url
         # Download with wget
+        print(f'\n[INFO] Downloading image for {df.Name[chidx]}')
         wget.download(image_url,out=image_path)
     # With the dataframe table complete, save it to a csv
     df.to_csv(anime_name.replace(' ','_') + '-Characters.csv')
@@ -287,7 +300,7 @@ def crop_faces_all():
 
 
 if __name__ == '__main__':
-    # list_anime_characters('Monster','Images/original-images')
+    list_anime_characters('Monster','Images/myanimelist-images-original')
     # get_character_images("Monster-Characters.csv",'Images/google-images')
     # load_image('Images/google-images/Adolf_Junkers/Adolf_Junkers_0.webp')
     # remove_grayscale_images("Monster-Characters.csv",'Images/google-images')
@@ -295,4 +308,4 @@ if __name__ == '__main__':
     # download_models()
     # image_name = 'Images/google-images-original/Robbie/Robbie_25.jpeg'
     # detector = crop_faces(image_name,cropped_dir='Images/google-images-cropped/Robbie')
-    crop_faces_all()
+    # crop_faces_all()

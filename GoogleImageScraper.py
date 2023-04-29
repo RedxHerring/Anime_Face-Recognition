@@ -11,6 +11,7 @@ from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.firefox.service import Service as FirefoxService
 from webdriver_manager.firefox import GeckoDriverManager
 
 #import helper libraries
@@ -40,7 +41,7 @@ class GoogleImageScraper():
             firefox_options = Options()
             if headless:
                 firefox_options.add_argument("--headless")
-            driver = webdriver.Firefox(executable_path=GeckoDriverManager().install(), options=firefox_options)
+            driver = webdriver.Firefox(service=FirefoxService(GeckoDriverManager().install()),options=firefox_options)
             driver.set_window_size(1400,1050)
 
         self.driver = driver
