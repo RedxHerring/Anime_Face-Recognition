@@ -145,9 +145,9 @@ def remove_grayscale_images(anime_file,images_path=''):
                 if is_gray(full_name):
                     os.remove(full_name)
 
-def area(a, b):  # returns intersecting area >= 0
+def overlapped_area(a, b):  # returns intersecting area >= 0
     # From https://stackoverflow.com/questions/27152904/calculate-overlapped-area-between-two-rectangles
-    # a and b expres rectangles as a = [a_xmin, a_ymin, a_xmax, a_ymax]
+    # a and b express rectangles as a = [a_xmin, a_ymin, a_xmax, a_ymax]
     dx =  max(min(a[2],b[2]) - max(a[0],b[0]), 0)
     dy =  max(min(a[3],b[3]) - max(a[1],b[1]), 0)
     return dx*dy
@@ -178,11 +178,29 @@ def crop_faces(img_name, img=None, detector=None, cropped_dir='Images/cropped-im
         # First we need to check for and remove cases of boxes within boxes.
         # Setting a lower nms_threshold would remove the outer box, but if that larger box is around two smaller boxes,
         # it likely means the larger box is detecting features from two seperate but nearby heads 
-        coords = np.array(faces[1][:,0:4])
-        areas = np.prod(coords[:,2:])
-        for idx, face in enumerate(faces[1]):
-            coords = face[:-1].astype(np.int32)
-            x1, y1, w, h = coords[0:4]
+        max_overlap = .4 # max fraction of face box that can intersect another box before we have a problem
+        coords = faces[1][:,0:4].astype(np.int32)
+        Nf = len(faces[1])
+        if Nf > 1:
+            rects = np.vstack((coords[:,0],coords[:,1],coords[:,0]+coords[:,2],coords[:,1]+coords[:,3])).T
+            areas = np.prod(coords[:,2:],axis=1)
+            # Initialize variable to store ares and boolean mask array
+            overlapped_areas = np.zeros((Nf,Nf))
+            keep_rect = np.full((Nf), True)
+            for idx in range(Nf):
+                for jdx in range(idx,Nf):
+                    if idx == jdx:
+                        continue
+                    overlapped_areas[idx,jdx] = overlapped_area(rects[idx,:],rects[jdx,:])
+                    overlapped_areas[jdx,idx] = overlapped_areas[idx,jdx]
+                ovlp_wrt_j = overlapped_areas[idx,:]/areas
+                if sum(ovlp_wrt_j>max_overlap) > 1: # this box contains mutliple faces
+                    keep_rect[idx] = False
+                elif sum(ovlp_wrt_j>max_overlap) == 1:
+                    keep_rect[ovlp_wrt_j>max_overlap] = False
+            coords = coords[keep_rect,:]
+        for idx in range(Nf):
+            x1, y1, w, h = coords[idx,0:4].astype(np.int32)
             # First save cropped version as determined by Yunet.
             # This way we can compare the images with other cropped ones
             imgi = img[y1:y1+h, x1:x1+w, :]
