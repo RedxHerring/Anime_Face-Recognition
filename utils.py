@@ -176,7 +176,7 @@ def crop_faces(img_name, img=None, detector=None, cropped_dir='Images/cropped-im
     m,n,_ = img.shape
     detector.setInputSize((n,m))
     try:
-        faces = detector.detect(img[0:100,:,:])
+        faces = detector.detect(img)
     except: # The image is simply too hot to handle, this is a rare bug
         print("[INFO] Image detect failed, skipping")
         detector = None # just in case something got wonky since it's uncharted territory
@@ -215,6 +215,8 @@ def crop_faces(img_name, img=None, detector=None, cropped_dir='Images/cropped-im
         Nf = len(coords)
         for idx in range(Nf):
             x1, y1, w, h = coords[idx,0:4]
+            if w == 0 or h == 0:
+                continue
             # First save cropped version as determined by Yunet.
             # This way we can compare the images with other cropped ones
             x2 = x1 + w
@@ -280,7 +282,7 @@ def crop_faces_all():
         print(crop_dir)
         imgs = glob.glob(dir + '/*.jpeg')
         for img in imgs:
-            print(img)
+            print('[INFO] Cropping ' + img)
             crop_faces(img, cropped_dir=crop_dir)
 
 
@@ -291,6 +293,6 @@ if __name__ == '__main__':
     # remove_grayscale_images("Monster-Characters.csv",'Images/google-images')
     # check_gray('Images/google-images/Anna_Liebert/')
     # download_models()
-    image_name = 'Images/google-images-original/Robbie/Robbie_25.jpeg'
-    detector = crop_faces(image_name,cropped_dir='Images/google-images-cropped/Robbie')
-    # crop_faces_all()
+    # image_name = 'Images/google-images-original/Robbie/Robbie_25.jpeg'
+    # detector = crop_faces(image_name,cropped_dir='Images/google-images-cropped/Robbie')
+    crop_faces_all()
