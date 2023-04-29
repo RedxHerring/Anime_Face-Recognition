@@ -162,6 +162,9 @@ def crop_faces(img_name, img=None, detector=None, cropped_dir='Images/cropped-im
             nms_threshold=.4
         )
     if img is None: # need to load image
+        if not os.path.exists(img_name):
+            print('[INFO] Image file does not exist, skipping')
+            return detector, idx0
         fullname, file_extension = os.path.splitext(img_name)
         filename = os.path.basename(fullname)
         character_name = os.path.basename(os.path.dirname(filename))
@@ -172,7 +175,12 @@ def crop_faces(img_name, img=None, detector=None, cropped_dir='Images/cropped-im
         images_path = os.path.join(cropped_dir,img_name)
     m,n,_ = img.shape
     detector.setInputSize((n,m))
-    faces = detector.detect(img)
+    try:
+        faces = detector.detect(img[0:100,:,:])
+    except: # The image is simply too hot to handle, this is a rare bug
+        print("[INFO] Image detect failed, skipping")
+        detector = None # just in case something got wonky since it's uncharted territory
+        return detector, idx0
     idx = 0 # initialize in case the for loop is skipped
     if faces[1] is not None:
         # First we need to check for and remove cases of boxes within boxes.
@@ -282,7 +290,7 @@ if __name__ == '__main__':
     # load_image('Images/google-images/Adolf_Junkers/Adolf_Junkers_0.webp')
     # remove_grayscale_images("Monster-Characters.csv",'Images/google-images')
     # check_gray('Images/google-images/Anna_Liebert/')
-    download_models()
-    # image_name = 'Images/google-images-original/Hartmann/Hartmann_59.jpeg'
-    # detector = crop_faces(image_name,cropped_dir='Images/google-images-cropped/Hartmann')
-    crop_faces_all()
+    # download_models()
+    image_name = 'Images/google-images-original/Robbie/Robbie_25.jpeg'
+    detector = crop_faces(image_name,cropped_dir='Images/google-images-cropped/Robbie')
+    # crop_faces_all()
