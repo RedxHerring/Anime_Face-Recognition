@@ -177,7 +177,7 @@ def crop_faces(img_name, img=None, detector=None, cropped_dir='Images/cropped-im
     if faces[1] is not None:
         # First we need to check for and remove cases of boxes within boxes.
         # Setting a lower nms_threshold would remove the outer box, but if that larger box is around two smaller boxes,
-        # it likely means the larger box is detecting features from two seperate but nearby heads 
+        # it likely means the larger box is detecting features from two seperate but nearby heads
         max_overlap = .4 # max fraction of face box that can intersect another box before we have a problem
         coords = faces[1][:,0:4].astype(np.int32)
         # Some value of coords may be negative numbers if it interpolates the face as extending outside of the image.
@@ -266,9 +266,9 @@ def crop_faces_in_video(video_path):
         ret, frame = cap.read()
 
 def crop_faces_all():
-    dirs = glob.glob('Images/google-images/*')
+    dirs = glob.glob('Images/google-images-original/*')
     for dir in dirs:
-        crop_dir = os.path.join('Images/cropped-images/',dir[7:])
+        crop_dir = os.path.join('Images/google-images-cropped/',dir[30:])
         print(crop_dir)
         imgs = glob.glob(dir + '/*.jpeg')
         for img in imgs:
@@ -283,6 +283,6 @@ if __name__ == '__main__':
     # remove_grayscale_images("Monster-Characters.csv",'Images/google-images')
     # check_gray('Images/google-images/Anna_Liebert/')
     download_models()
-    image_name = 'Images/google-images-original/Adolf_Junkers/Adolf_Junkers_111.jpeg'
-    detector = crop_faces(image_name,cropped_dir='Images/google-images-cropped/Adolf_Junkers')
-    # crop_faces_all()
+    # image_name = 'Images/google-images-original/Hartmann/Hartmann_59.jpeg'
+    # detector = crop_faces(image_name,cropped_dir='Images/google-images-cropped/Hartmann')
+    crop_faces_all()
