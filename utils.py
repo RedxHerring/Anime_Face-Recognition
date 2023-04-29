@@ -158,7 +158,7 @@ def crop_faces(img_name, img=None, detector=None, cropped_dir='Images/cropped-im
             "models/fd_yunet.onnx",
             "",
             input_size=(320, 320),
-            score_threshold=.2,
+            score_threshold=.3,
             nms_threshold=.4
         )
     if img is None: # need to load image
@@ -180,6 +180,8 @@ def crop_faces(img_name, img=None, detector=None, cropped_dir='Images/cropped-im
         # it likely means the larger box is detecting features from two seperate but nearby heads 
         max_overlap = .4 # max fraction of face box that can intersect another box before we have a problem
         coords = faces[1][:,0:4].astype(np.int32)
+        # Some value of coords may be negative numbers if it interpolates the face as extending outside of the image.
+        # We will leave this for now, as we want a good idea of face sizes for the sorting process.
         Nf = len(coords)
         if Nf > 1:
             rects = np.vstack((coords[:,0],coords[:,1],coords[:,0]+coords[:,2],coords[:,1]+coords[:,3])).T
@@ -199,12 +201,21 @@ def crop_faces(img_name, img=None, detector=None, cropped_dir='Images/cropped-im
                 elif sum(ovlp_wrt_j>max_overlap) == 1:
                     keep_rect[ovlp_wrt_j>max_overlap] = False
             coords = coords[keep_rect,:]
+        # With the sorting process done, we need to remove any negative values.
+        coords = np.maximum(0,coords)
+        # There may still be values that are too large, but it's more convenient to sort this out within the loop
         Nf = len(coords)
         for idx in range(Nf):
             x1, y1, w, h = coords[idx,0:4]
             # First save cropped version as determined by Yunet.
             # This way we can compare the images with other cropped ones
-            imgi = img[y1:y1+h, x1:x1+w, :]
+            x2 = x1 + w
+            if x2 > n:
+                x2 = n
+            y2 = y1 + h
+            if y2 > m:
+                y2 = m
+            imgi = img[y1:y2, x1:x2, :]
             namei =  os.path.join(images_path,filename+'-'+str(idx0+idx)+'.png')
             cv2.imwrite(namei,imgi)
             # Now get a square crop to use with CNN, which we can easily scale as needed.
@@ -272,6 +283,6 @@ if __name__ == '__main__':
     # remove_grayscale_images("Monster-Characters.csv",'Images/google-images')
     # check_gray('Images/google-images/Anna_Liebert/')
     download_models()
-    image_name = 'Images/google-images/Johan_Liebert/image.png'
+    image_name = 'Images/original-images/google-images/Adolf_Junkers/Adolf_Junkers_111.jpeg'
     detector = crop_faces(image_name)
     # crop_faces_all()
