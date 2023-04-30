@@ -98,13 +98,14 @@ def list_anime_characters(anime_name,images_path='',keep_filenames=False):
     print('[INFO] Collecting characters')
     for elem in elem_list:
         character_name = elem.text.partition("\n")[0]
+        # First conver "Last, First" into "First Last" since commas are separators in .csv
         if ',' in character_name:
             lastfirst = character_name.partition(",")
             character_name = lastfirst[2] + " " + lastfirst[0]
             if character_name[0] == " ": # extra space is generated
                 character_name = character_name[1:]
-        character_name = character_name
-        while character_name in character_names: # Character name already present
+        # Check if character name already present, can happen for small side character names
+        while character_name in character_names: 
             if char_is_num(character_name[-1]):
                 character_name = character_name[0:-1] + str(int(character_name[-1])+1)
             else:
@@ -129,7 +130,7 @@ def list_anime_characters(anime_name,images_path='',keep_filenames=False):
         elem = driver.find_element(By.CLASS_NAME,'title-name.h1_bold_none')
         names_list = elem.text.split('"')
         if len(names_list) > 1:
-            df.Other_Names[chidx] = names_list[1]
+            df.Other_Names[chidx] = names_list[1].replace('"','') # for multiple names the "" get dragged along for some reason
         # Now we want to extract the image that comes with the character, as for minor characters we won't find one elsewhere.
         WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, 'portrait-225x350.lazyloaded')))
         elem = driver.find_element(By.CLASS_NAME,'portrait-225x350.lazyloaded') # find main character image on the page
