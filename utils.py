@@ -16,6 +16,7 @@ from urllib.parse import urlparse
 import io
 import cv2
 import os
+import shutil
 import pandas as pd
 import glob
 from runGoogleImagScraper import parallel_worker_threads
@@ -203,13 +204,23 @@ def overlapped_area(a, b):  # returns intersecting area >= 0
     dy =  max(min(a[3],b[3]) - max(a[1],b[1]), 0)
     return dx*dy
 
-def crop_faces(img_name, img=None, detector=None, cropped_dir='Images/cropped-images',idx0=0):
+def crop_faces(img_name, img=None, detector=None, cropped_dir='Images/cropped-images',idx0=0,score_threshold=.3,min_dim=16):
+    '''
+    INPUTS
+    img_name - full path to input image if img is None, or output name if img is input image
+    img - input image array
+    detector - instance of cv2.FaceDetectorYN if we want to customize it
+    cropped_dir - output directory for images, or parent directory of subdirectory for images if image_name comes from a directory for a character name
+    idx0 - index of image within that image, can be used if multiple images with the same img_name will be used so we can iterate indx0 across function calls
+    score_threshold - score (~probabaility) for a face deteciton to pass as valid
+    min_dim - minimum dimension of a detected face, for it to be considered valid
+    '''
     if detector is None:
         detector = cv2.FaceDetectorYN.create(
             "models/fd_yunet.onnx",
             "",
             input_size=(320, 320),
-            score_threshold=.3,
+            score_threshold=score_threshold,
             nms_threshold=.4
         )
     if img is None: # need to load image
@@ -219,11 +230,15 @@ def crop_faces(img_name, img=None, detector=None, cropped_dir='Images/cropped-im
         fullname, file_extension = os.path.splitext(img_name)
         filename = os.path.basename(fullname)
         character_name = os.path.basename(os.path.dirname(filename))
-        images_path = os.path.join(cropped_dir,character_name)
-        os.makedirs(images_path,exist_ok=True)
+        cropped_dir = os.path.join(cropped_dir,character_name)
         img = cv2.imread(img_name)
     else:
-        images_path = os.path.join(cropped_dir,img_name)
+        filename = img_name
+    os.makedirs(cropped_dir,exist_ok=True)
+    if np.std(img)<5 or np.std(img)/(np.max(img) - np.min(img))<.15: # basically one color, no features
+        print("[INFO] Image is effectively single-color, skipping")
+        detector = None # just in case something got wonky since it's uncharted territory
+        return detector, idx0
     m,n,_ = img.shape
     detector.setInputSize((n,m))
     try:
@@ -266,7 +281,7 @@ def crop_faces(img_name, img=None, detector=None, cropped_dir='Images/cropped-im
         Nf = len(coords)
         for idx in range(Nf):
             x1, y1, w, h = coords[idx,0:4]
-            if w == 0 or h == 0:
+            if min(w,h) < min_dim:
                 continue
             # First save cropped version as determined by Yunet.
             # This way we can compare the images with other cropped ones
@@ -277,7 +292,7 @@ def crop_faces(img_name, img=None, detector=None, cropped_dir='Images/cropped-im
             if y2 > m:
                 y2 = m
             imgi = img[y1:y2, x1:x2, :]
-            namei =  os.path.join(images_path,filename+'-'+str(idx0+idx)+'.png')
+            namei =  os.path.join(cropped_dir,filename+'-'+str(idx0+idx)+'.png')
             cv2.imwrite(namei,imgi)
             # Now get a square crop to use with CNN, which we can easily scale as needed.
             # Start by enlarging by 10% in all directions, to get full chin and ears, and more hair.
@@ -308,7 +323,7 @@ def crop_faces(img_name, img=None, detector=None, cropped_dir='Images/cropped-im
                 x1 = x1 + dw
                 x2 = x1 + ws
             imgs = img[y1:y1+hs, x1:x1+ws, :]
-            names =  os.path.join(images_path,filename+'-square'+str(idx0+idx)+'.png')
+            names =  os.path.join(cropped_dir,filename+'-square'+str(idx0+idx)+'.png')
             cv2.imwrite(names,imgs)
     return detector, idx0+idx # so we don't have to re-initialize next time
 
@@ -326,19 +341,62 @@ def crop_faces_in_video(video_path):
     while(cap.isOpened()):
         ret, frame = cap.read()
 
-def crop_faces_all():
-    dirs = glob.glob('Images/google-images-original/*')
+def crop_orig_imgs():
+    dirs = glob.glob('Images/*-original/*')
     for dir in dirs:
-        crop_dir = os.path.join('Images/google-images-cropped/',dir[30:])
+        image_type = os.path.basename(os.path.dirname(dir))[0:-8]
+        crop_dir = os.path.join('Images',image_type+'cropped',os.path.basename(dir))
         print(crop_dir)
-        imgs = glob.glob(dir + '/*.jpeg')
-        for img in imgs:
-            print('[INFO] Cropping ' + img)
-            crop_faces(img, cropped_dir=crop_dir)
+        for file in os.listdir(dir):
+            if file.endswith(".png") or file.endswith(".jpg") or file.endswith(".jpeg") or file.endswith(".webp"):
+                full_name = os.path.join(dir,file)
+                print('[INFO] Cropping ' + full_name)
+                _, idx0 = crop_faces(full_name, cropped_dir=crop_dir)
+                if not idx0: # 0 faces were found
+                    noface_dir = os.path.join('Images',image_type+'noface',os.path.basename(dir))
+                    os.makedirs(noface_dir,exist_ok=True)
+                    shutil.copy(os.path.join(dir,file),os.path.join(noface_dir,file))
+
+def crop_video_frames(videos_dir):
+    detector = None
+    for Ep,file in enumerate(sorted(os.listdir(videos_dir))):
+        Epstr = str(Ep+1)
+        if len(Epstr) == 1:
+            Epstr = '0' + Epstr
+        print(f'[INFO] Extracting faces from {file}, designated as Ep{Epstr}')
+        if file.endswith(".mkv") or file.endswith(".mp4") or file.endswith(".avi") or file.endswith(".webm"):
+            cap = cv2.VideoCapture(os.path.join(videos_dir,file))
+            timestamps = []
+            while(cap.isOpened()):
+                ret, frame = cap.read()
+                if ret:
+                    timestamps.append(cap.get(cv2.CAP_PROP_POS_MSEC))
+                    hh = int(timestamps[-1]/(1000*3600))
+                    rem_ms = (timestamps[-1]-3600*1000*hh)
+                    mm = int(rem_ms/(1000*60))
+                    rem_ms -= mm*60*1000
+                    ss = int(rem_ms/1000)
+                    rem_ms -= ss*1000
+                    ms = int(rem_ms)
+                    hh = str(hh)
+                    if len(hh) == 1:
+                        hh = '0' + hh
+                    mm = str(mm)
+                    if len(mm) == 1:
+                        mm = '0' + mm
+                    ss = str(ss)
+                    if len(ss) == 1:
+                        ss = '0' + ss
+                    ms = str(ms)
+                    ms = '0'*(3-len(ms)) + ms
+                    cropped_name = 'Ep'+Epstr+'hh'+hh+'mm'+mm+'ss'+ss+'ms'+ms
+                    detector,idx0 = crop_faces(img_name=cropped_name, img=frame, detector=detector, cropped_dir='Images/anime-frames-cropped',score_threshold=.5)
+                    print(f'{idx0} images found for {cropped_name}')
+
 
 
 if __name__ == '__main__':
-    list_anime_characters('Monster','Images/myanimelist-images-original')
+    # list_anime_characters('Monster','Images/myanimelist-images-original')
     # get_character_images("Monster-Characters.csv",'Images/google-images')
     # load_image('Images/google-images/Adolf_Junkers/Adolf_Junkers_0.webp')
     # remove_grayscale_images("Monster-Characters.csv",'Images/google-images')
@@ -346,4 +404,5 @@ if __name__ == '__main__':
     # download_models()
     # image_name = 'Images/google-images-original/Robbie/Robbie_25.jpeg'
     # detector = crop_faces(image_name,cropped_dir='Images/google-images-cropped/Robbie')
-    # crop_faces_all()
+    # crop_orig_imgs()
+    crop_video_frames('Monster.S01.480p.NF.WEB-DL.DDP2.0.x264-Emmid')
