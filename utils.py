@@ -1,6 +1,5 @@
 # Here there will be a number of short scripts
 import numpy as np
-import time
 from selenium import webdriver
 from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.common.by import By
@@ -8,13 +7,16 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.firefox.service import Service as FirefoxService
+from selenium.webdriver.common.html5.application_cache import ApplicationCache
 from webdriver_manager.firefox import GeckoDriverManager
 
 import requests
+from PIL import Image
+from urllib.parse import urlparse
+import io
 import cv2
 import os
 import pandas as pd
-import wget
 import glob
 from runGoogleImagScraper import parallel_worker_threads
 
@@ -24,6 +26,42 @@ def char_is_num(x):
     else:
         return False
 
+def download_image(image_url, image_path="", filename=None):
+    if filename is None:
+        keep_filenames = True
+    else:
+        keep_filenames = False
+    image = requests.get(image_url,timeout=5)
+    if image.status_code == 200:
+        with Image.open(io.BytesIO(image.content)) as image_from_web:
+            try:
+                if keep_filenames:
+                    #extact filename without extension from URL
+                    o = urlparse(image_url)
+                    image_url = o.scheme + "://" + o.netloc + o.path
+                    name = os.path.splitext(os.path.basename(image_url))[0]
+                    #join filename and extension
+                    filename = "%s.%s"%(name,image_from_web.format.lower())
+
+                image_path = os.path.join(image_path, filename)
+                print(
+                    f"[INFO] Image saved at: {image_path}")
+                image_from_web.save(image_path)
+            except OSError:
+                rgb_im = image_from_web.convert('RGB')
+                rgb_im.save(image_path)
+            image_from_web.close()
+
+def imma_human(driver,class_name):
+    try:
+        WebDriverWait(driver, 6).until(EC.presence_of_element_located((By.CLASS_NAME, class_name)))
+        return driver
+    except: # We likely have been accused of being a bot
+        driver.find_element(By.CLASS_NAME,'g-recaptcha').click()
+        print("[INFO] Recursing to pass Turing test")
+        return imma_human(driver,class_name)
+
+
 # This function takes as input an anime name and wills earch for it on myanimelist,
 # and then find all the characters listed for that anime and save names and nicknames
 # in a csv, as well as saving an image of the character in a given directory
@@ -32,6 +70,8 @@ def list_anime_characters(anime_name,images_path='',keep_filenames=False):
     firefox_options = Options()
     firefox_options.add_argument("--headless")
     driver = webdriver.Firefox(service=FirefoxService(GeckoDriverManager().install()),options=firefox_options)
+    app_cache = ApplicationCache(driver)
+    app_cache.DOWNLOADING = 3
     # Using https://stackoverflow.com/questions/63232160/cannot-locate-search-bar-with-selenium-in-python
     driver.get('https://myanimelist.net/anime.php')
     WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "q")))
@@ -39,7 +79,7 @@ def list_anime_characters(anime_name,images_path='',keep_filenames=False):
     elem.send_keys(anime_name)
     elem.send_keys(Keys.ENTER)
     # Now we need to go through the search results and find the right one.
-    time.sleep(5)
+    WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, 'hoverinfo_trigger.fw-b.fl-l')))
     # Class contains spaces which we replace with dots
     elem_list = driver.find_elements(By.CLASS_NAME,'hoverinfo_trigger.fw-b.fl-l')
     for elem in elem_list: # Loop through search results
@@ -74,7 +114,6 @@ def list_anime_characters(anime_name,images_path='',keep_filenames=False):
         link_elem = elem.find_element(By.CLASS_NAME,'spaceit_pad').find_element(By.CSS_SELECTOR,'a')
         character_types.append(elem.find_elements(By.CLASS_NAME,'spaceit_pad')[1].text)
         character_links.append(link_elem.get_attribute('href'))
-
     # Create table with character name and links, as well as any alternative names.
     d = {'Name': character_names, 'Character_Type': character_types, 'Other_Names': ['']*len(character_names), 'Link': character_links, 'Image_Link': character_links}
     # Note we reused variables to initialize the table values,a nd we will modify them as we loop through
@@ -85,18 +124,12 @@ def list_anime_characters(anime_name,images_path='',keep_filenames=False):
         image_path = os.path.join(images_path,character_name.replace(" ","_"))
         os.makedirs(image_path,exist_ok=True)
         driver.get(link)
-        cidx = 0
-        while cidx < 3:
-            try:
-                WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, 'title-name.h1_bold_none')))
-                # Now that we're on the page, we try to get alternative character names, which will be in the title in ""
-                elem = driver.find_element(By.CLASS_NAME,'title-name.h1_bold_none')
-                names_list = elem.text.split('"')
-                if len(names_list) > 1:
-                    df.Other_Names[chidx] = names_list[1]
-                break
-            except:
-                cidx += 1
+        driver = imma_human(driver,class_name='title-name.h1_bold_none')
+        # Now that we're on the page, we try to get alternative character names, which will be in the title in ""
+        elem = driver.find_element(By.CLASS_NAME,'title-name.h1_bold_none')
+        names_list = elem.text.split('"')
+        if len(names_list) > 1:
+            df.Other_Names[chidx] = names_list[1]
         # Now we want to extract the image that comes with the character, as for minor characters we won't find one elsewhere.
         WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, 'portrait-225x350.lazyloaded')))
         elem = driver.find_element(By.CLASS_NAME,'portrait-225x350.lazyloaded') # find main character image on the page
@@ -104,9 +137,13 @@ def list_anime_characters(anime_name,images_path='',keep_filenames=False):
         df.Image_Link[chidx] = image_url
         # Download with wget
         print(f'\n[INFO] Downloading image for {df.Name[chidx]}')
-        wget.download(image_url,out=image_path)
+        if keep_filenames:
+            download_image(image_url, image_path)
+        else:
+            download_image(image_url, image_path,character_name.replace(" ","_")+".png")
     # With the dataframe table complete, save it to a csv
     df.to_csv(anime_name.replace(' ','_') + '-Characters.csv')
+    driver.quit()
 
 # This function takes as input the anme of a csv as generated by list_anime_characters,
 # and then runs other functions to download google iamges for each character.
