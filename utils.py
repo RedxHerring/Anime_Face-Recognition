@@ -204,7 +204,7 @@ def overlapped_area(a, b):  # returns intersecting area >= 0
     dy =  max(min(a[3],b[3]) - max(a[1],b[1]), 0)
     return dx*dy
 
-def crop_faces(img_name, img=None, detector=None, cropped_dir='Images/cropped-images',idx0=0,score_threshold=.3,min_dim=16):
+def crop_faces(img_name, img=None, detector=None, cropped_dir='Images/cropped-images',idx0=0,score_threshold=.3,min_dim=16,save_rect=True,save_square=True):
     '''
     INPUTS
     img_name - full path to input image if img is None, or output name if img is input image
@@ -285,46 +285,48 @@ def crop_faces(img_name, img=None, detector=None, cropped_dir='Images/cropped-im
                 continue
             # First save cropped version as determined by Yunet.
             # This way we can compare the images with other cropped ones
-            x2 = x1 + w
-            if x2 > n:
-                x2 = n
-            y2 = y1 + h
-            if y2 > m:
-                y2 = m
-            imgi = img[y1:y2, x1:x2, :]
-            namei =  os.path.join(cropped_dir,filename+'-'+str(idx0+idx)+'.png')
-            cv2.imwrite(namei,imgi)
+            if save_rect:
+                x2 = x1 + w
+                if x2 > n:
+                    x2 = n
+                y2 = y1 + h
+                if y2 > m:
+                    y2 = m
+                imgi = img[y1:y2, x1:x2, :]
+                namei =  os.path.join(cropped_dir,filename+'-'+str(idx0+idx)+'.png')
+                cv2.imwrite(namei,imgi)
             # Now get a square crop to use with CNN, which we can easily scale as needed.
             # Start by enlarging by 10% in all directions, to get full chin and ears, and more hair.
-            ws = int(1.2*max(w,h))
-            # Expand borders in x direction
-            dw = int((ws-w)/2)
-            x1 = x1 - dw
-            if x1 < 0:
-                x1 = 0
-            x2 = x1 + ws
-            if x2 > n:
-                x2 = n
-                ws = x2 - x1 + 1 # shrink border
-            # Expand borders in y direction
-            hs = ws
-            dh = int((hs-h)/2)
-            y1 = y1 - dh
-            if y1 < 0:
-                y1 = 0
-            y2 = y1 + hs
-            if y2 > m:
-                y2 = m
-                hs = y2 - y1 + 1
-            # Now shrink x again if necessary
-            if hs < ws:
-                dw = int((ws-hs)/2)
-                ws = hs
-                x1 = x1 + dw
+            if save_square:
+                ws = int(1.2*max(w,h))
+                # Expand borders in x direction
+                dw = int((ws-w)/2)
+                x1 = x1 - dw
+                if x1 < 0:
+                    x1 = 0
                 x2 = x1 + ws
-            imgs = img[y1:y1+hs, x1:x1+ws, :]
-            names =  os.path.join(cropped_dir,filename+'-square'+str(idx0+idx)+'.png')
-            cv2.imwrite(names,imgs)
+                if x2 > n:
+                    x2 = n
+                    ws = x2 - x1 + 1 # shrink border
+                # Expand borders in y direction
+                hs = ws
+                dh = int((hs-h)/2)
+                y1 = y1 - dh
+                if y1 < 0:
+                    y1 = 0
+                y2 = y1 + hs
+                if y2 > m:
+                    y2 = m
+                    hs = y2 - y1 + 1
+                # Now shrink x again if necessary
+                if hs < ws:
+                    dw = int((ws-hs)/2)
+                    ws = hs
+                    x1 = x1 + dw
+                    x2 = x1 + ws
+                imgs = img[y1:y1+hs, x1:x1+ws, :]
+                names =  os.path.join(cropped_dir,filename+'-square'+str(idx0+idx)+'.png')
+                cv2.imwrite(names,imgs)
     return detector, idx0+idx # so we don't have to re-initialize next time
 
 def download_models():
@@ -336,10 +338,12 @@ def download_models():
     with open(os.path.join(download_path, file_name), 'wb') as fd:
         fd.write(r.content)
 
-def crop_faces_in_video(video_path):
-    cap = cv2.VideoCapture('linusi.mp4')
-    while(cap.isOpened()):
-        ret, frame = cap.read()
+def imgs_in_dir(images_dir):
+    imtypes = ['png','jpg','jpeg','webp']
+    imgs_list = []
+    for imtype in imtypes:
+        imgs_list.extend(glob.glob(os.path.join(images_dir,'*.'+imtype)))
+    return imgs_list
 
 def crop_orig_imgs():
     dirs = glob.glob('Images/*-original/*')
@@ -359,6 +363,7 @@ def crop_orig_imgs():
 
 def crop_video_frames(videos_dir):
     detector = None
+    skip_frames = 100
     for Ep,file in enumerate(sorted(os.listdir(videos_dir))):
         Epstr = str(Ep+1)
         if len(Epstr) == 1:
@@ -366,33 +371,76 @@ def crop_video_frames(videos_dir):
         print(f'[INFO] Extracting faces from {file}, designated as Ep{Epstr}')
         if file.endswith(".mkv") or file.endswith(".mp4") or file.endswith(".avi") or file.endswith(".webm"):
             cap = cv2.VideoCapture(os.path.join(videos_dir,file))
-            timestamps = []
+            nfails = 0
+            fidx = 0
             while(cap.isOpened()):
                 ret, frame = cap.read()
                 if ret:
-                    timestamps.append(cap.get(cv2.CAP_PROP_POS_MSEC))
-                    hh = int(timestamps[-1]/(1000*3600))
-                    rem_ms = (timestamps[-1]-3600*1000*hh)
-                    mm = int(rem_ms/(1000*60))
-                    rem_ms -= mm*60*1000
-                    ss = int(rem_ms/1000)
-                    rem_ms -= ss*1000
-                    ms = int(rem_ms)
-                    hh = str(hh)
-                    if len(hh) == 1:
-                        hh = '0' + hh
-                    mm = str(mm)
-                    if len(mm) == 1:
-                        mm = '0' + mm
-                    ss = str(ss)
-                    if len(ss) == 1:
-                        ss = '0' + ss
-                    ms = str(ms)
-                    ms = '0'*(3-len(ms)) + ms
-                    cropped_name = 'Ep'+Epstr+'hh'+hh+'mm'+mm+'ss'+ss+'ms'+ms
-                    detector,idx0 = crop_faces(img_name=cropped_name, img=frame, detector=detector, cropped_dir='Images/anime-frames-cropped',score_threshold=.5)
-                    print(f'{idx0} images found for {cropped_name}')
+                    if fidx == skip_frames:
+                        timestamp= cap.get(cv2.CAP_PROP_POS_MSEC)
+                        hh = int(timestamp/(1000*3600))
+                        rem_ms = (timestamp-3600*1000*hh)
+                        mm = int(rem_ms/(1000*60))
+                        rem_ms -= mm*60*1000
+                        ss = int(rem_ms/1000)
+                        rem_ms -= ss*1000
+                        ms = int(rem_ms)
+                        hh = str(hh)
+                        if len(hh) == 1:
+                            hh = '0' + hh
+                        mm = str(mm)
+                        if len(mm) == 1:
+                            mm = '0' + mm
+                        ss = str(ss)
+                        if len(ss) == 1:
+                            ss = '0' + ss
+                        ms = str(ms)
+                        ms = '0'*(3-len(ms)) + ms
+                        cropped_name = 'Ep'+Epstr+'hh'+hh+'mm'+mm+'ss'+ss+'ms'+ms
+                        detector,idx0 = crop_faces(img_name=cropped_name, img=frame, detector=detector, cropped_dir='Images/anime-frames-cropped',score_threshold=.8,save_rect=False)
+                        print(f'{idx0} images found for {cropped_name}')
+                        fidx = 0
+                    else:
+                        fidx += 1
+                else:
+                    nfails += 1
+                    if nfails > 2:
+                        cap.release()
 
+
+def identical_images(img1,img2,L1_thresh=.05):
+    # For this function we consider a lighter version of an image to be the same image, 
+    # as we want to know how many truly unique iamges we have.
+    # Therefore, we start by normalizing.
+    img1 = img1/np.max(img1)
+    img2 = img2/np.max(img2)
+    m1,n1,_ = img1.shape
+    m2,n2,_ = img2.shape
+    mindim = min(m1,n1,m2,n2)
+    img1 = cv2.resize(img1, (mindim, mindim))
+    img2 = cv2.resize(img2, (mindim, mindim))
+    if img1.size != img2.size: # different dimensions
+        return False
+    L1 = np.sum(np.abs(img1-img2))/img1.size
+    return L1 < L1_thresh
+
+
+def remove_duplicates(images_dir):
+    imgs_list = imgs_in_dir(images_dir)
+    Li = len(imgs_list)
+    is_duplicate = np.full(Li, False)
+    for idx in range(Li):
+        if is_duplicate[idx]:
+            os.remove(imgs_list[idx])
+            continue
+        else:
+            img1 = cv2.imread(imgs_list[idx])
+        for jdx in range(idx+1,Li):
+            if is_duplicate[jdx]:
+                continue
+            else:
+                img2 = cv2.imread(imgs_list[jdx])
+            is_duplicate[jdx] = identical_images(img1,img2)
 
 
 if __name__ == '__main__':
@@ -405,4 +453,5 @@ if __name__ == '__main__':
     # image_name = 'Images/google-images-original/Robbie/Robbie_25.jpeg'
     # detector = crop_faces(image_name,cropped_dir='Images/google-images-cropped/Robbie')
     # crop_orig_imgs()
-    crop_video_frames('Monster.S01.480p.NF.WEB-DL.DDP2.0.x264-Emmid')
+    # crop_video_frames('Monster.S01.480p.NF.WEB-DL.DDP2.0.x264-Emmid')
+    remove_duplicates('Images/anime-frames-cropped')
