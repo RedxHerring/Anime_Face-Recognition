@@ -19,6 +19,7 @@ import os
 import shutil
 import pandas as pd
 import glob
+from configparser import ConfigParser
 from runGoogleImagScraper import parallel_worker_threads
 
 def char_is_num(x):
@@ -178,12 +179,11 @@ def is_gray(imgpath):
     else:
         return False
 
-def check_gray(dir):
-    for img in os.listdir(dir):
-        try:
-            print(img + ': ' + str(is_gray(dir + img)))
-        except:
-            pass
+def files_in_dir(files_dir,ftypes=['png','jpg','jpeg','webp']):
+    files_list = []
+    for ftype in ftypes:
+        files_list.extend(glob.glob(os.path.join(files_dir,'*.'+ftype)))
+    return files_list
 
 def remove_grayscale_images(anime_file,images_path=''):
     if images_path[0] != '/':
@@ -191,11 +191,11 @@ def remove_grayscale_images(anime_file,images_path=''):
     df = pd.read_csv(anime_file)
     for idx in df.index:
         image_path = os.path.join(images_path,df.Name[idx].replace(" ","_"))
-        for file in os.listdir(image_path):
-            if file.endswith(".png") or file.endswith(".jpg") or file.endswith(".jpeg") or file.endswith(".webp"):
-                full_name = os.path.join(image_path,file)
-                if is_gray(full_name):
-                    os.remove(full_name)
+        image_files = files_in_dir(image_path)
+        for file in image_files:
+            full_name = os.path.join(image_path,file)
+            if is_gray(full_name):
+                os.remove(full_name)
 
 def overlapped_area(a, b):  # returns intersecting area >= 0
     # From https://stackoverflow.com/questions/27152904/calculate-overlapped-area-between-two-rectangles
@@ -214,6 +214,8 @@ def crop_faces(img_name, img=None, detector=None, cropped_dir='Images/cropped-im
     idx0 - index of image within that image, can be used if multiple images with the same img_name will be used so we can iterate indx0 across function calls
     score_threshold - score (~probabaility) for a face deteciton to pass as valid
     min_dim - minimum dimension of a detected face, for it to be considered valid
+    save_rect - boolean to determine whether or not to save the crop from cv2
+    save_square - boolean to determine whether to save larger modified square crop
     '''
     if detector is None:
         detector = cv2.FaceDetectorYN.create(
@@ -338,74 +340,67 @@ def download_models():
     with open(os.path.join(download_path, file_name), 'wb') as fd:
         fd.write(r.content)
 
-def imgs_in_dir(images_dir):
-    imtypes = ['png','jpg','jpeg','webp']
-    imgs_list = []
-    for imtype in imtypes:
-        imgs_list.extend(glob.glob(os.path.join(images_dir,'*.'+imtype)))
-    return imgs_list
-
 def crop_orig_imgs():
     dirs = glob.glob('Images/*-original/*')
     for dir in dirs:
         image_type = os.path.basename(os.path.dirname(dir))[0:-8]
         crop_dir = os.path.join('Images',image_type+'cropped',os.path.basename(dir))
         print(crop_dir)
-        for file in os.listdir(dir):
-            if file.endswith(".png") or file.endswith(".jpg") or file.endswith(".jpeg") or file.endswith(".webp"):
-                full_name = os.path.join(dir,file)
-                print('[INFO] Cropping ' + full_name)
-                _, idx0 = crop_faces(full_name, cropped_dir=crop_dir)
-                if not idx0: # 0 faces were found
-                    noface_dir = os.path.join('Images',image_type+'noface',os.path.basename(dir))
-                    os.makedirs(noface_dir,exist_ok=True)
-                    shutil.copy(os.path.join(dir,file),os.path.join(noface_dir,file))
+        image_files = files_in_dir(dir)
+        for file in image_files:
+            full_name = os.path.join(dir,file)
+            print('[INFO] Cropping ' + full_name)
+            _, idx0 = crop_faces(full_name, cropped_dir=crop_dir)
+            if not idx0: # 0 faces were found
+                noface_dir = os.path.join('Images',image_type+'noface',os.path.basename(dir))
+                os.makedirs(noface_dir,exist_ok=True)
+                shutil.copy(os.path.join(dir,file),os.path.join(noface_dir,file))
 
-def crop_video_frames(videos_dir):
+def crop_video_frames(videos_dir,out_dir='anime-frames-cropped'):
     detector = None
-    skip_frames = 100
-    for Ep,file in enumerate(sorted(os.listdir(videos_dir))):
+    skip_frames = 5000
+    video_files = files_in_dir(videos_dir,["mkv","mp4","avi","webm"])
+    for Ep,file in enumerate(sorted(video_files)):
         Epstr = str(Ep+1)
         if len(Epstr) == 1:
             Epstr = '0' + Epstr
         print(f'[INFO] Extracting faces from {file}, designated as Ep{Epstr}')
-        if file.endswith(".mkv") or file.endswith(".mp4") or file.endswith(".avi") or file.endswith(".webm"):
-            cap = cv2.VideoCapture(os.path.join(videos_dir,file))
-            nfails = 0
-            fidx = 0
-            while(cap.isOpened()):
-                ret, frame = cap.read()
-                if ret:
-                    if fidx == skip_frames:
-                        timestamp= cap.get(cv2.CAP_PROP_POS_MSEC)
-                        hh = int(timestamp/(1000*3600))
-                        rem_ms = (timestamp-3600*1000*hh)
-                        mm = int(rem_ms/(1000*60))
-                        rem_ms -= mm*60*1000
-                        ss = int(rem_ms/1000)
-                        rem_ms -= ss*1000
-                        ms = int(rem_ms)
-                        hh = str(hh)
-                        if len(hh) == 1:
-                            hh = '0' + hh
-                        mm = str(mm)
-                        if len(mm) == 1:
-                            mm = '0' + mm
-                        ss = str(ss)
-                        if len(ss) == 1:
-                            ss = '0' + ss
-                        ms = str(ms)
-                        ms = '0'*(3-len(ms)) + ms
-                        cropped_name = 'Ep'+Epstr+'hh'+hh+'mm'+mm+'ss'+ss+'ms'+ms
-                        detector,idx0 = crop_faces(img_name=cropped_name, img=frame, detector=detector, cropped_dir='Images/anime-frames-cropped',score_threshold=.8,save_rect=False)
-                        print(f'{idx0} images found for {cropped_name}')
-                        fidx = 0
-                    else:
-                        fidx += 1
+        cap = cv2.VideoCapture(os.path.join(file))
+        nfails = 0
+        fidx = 0
+        while(cap.isOpened()):
+            ret, frame = cap.read()
+            if ret:
+                if fidx == skip_frames:
+                    timestamp= cap.get(cv2.CAP_PROP_POS_MSEC)
+                    hh = int(timestamp/(1000*3600))
+                    rem_ms = (timestamp-3600*1000*hh)
+                    mm = int(rem_ms/(1000*60))
+                    rem_ms -= mm*60*1000
+                    ss = int(rem_ms/1000)
+                    rem_ms -= ss*1000
+                    ms = int(rem_ms)
+                    hh = str(hh)
+                    if len(hh) == 1:
+                        hh = '0' + hh
+                    mm = str(mm)
+                    if len(mm) == 1:
+                        mm = '0' + mm
+                    ss = str(ss)
+                    if len(ss) == 1:
+                        ss = '0' + ss
+                    ms = str(ms)
+                    ms = '0'*(3-len(ms)) + ms
+                    cropped_name = 'Ep'+Epstr+'hh'+hh+'mm'+mm+'ss'+ss+'ms'+ms
+                    detector,idx0 = crop_faces(img_name=cropped_name, img=frame, detector=detector, cropped_dir='Images/'+out_dir,score_threshold=.8,save_rect=False)
+                    print(f'{idx0} images found for {cropped_name}')
+                    fidx = 0
                 else:
-                    nfails += 1
-                    if nfails > 2:
-                        cap.release()
+                    fidx += 1
+            else:
+                nfails += 1
+                if nfails > 2:
+                    cap.release()
 
 
 def identical_images(img1,img2,L1_thresh=.05):
@@ -426,7 +421,7 @@ def identical_images(img1,img2,L1_thresh=.05):
 
 
 def remove_duplicates(images_dir):
-    imgs_list = imgs_in_dir(images_dir)
+    imgs_list = files_in_dir(images_dir)
     Li = len(imgs_list)
     is_duplicate = np.full(Li, False)
     for idx in range(Li):
@@ -442,6 +437,63 @@ def remove_duplicates(images_dir):
                 img2 = cv2.imread(imgs_list[jdx])
             is_duplicate[jdx] = identical_images(img1,img2)
 
+def get_colorspace(images_dir,cfg_name='anime_colorspace.ini'):
+    imgs_list = files_in_dir(images_dir)
+    N = len(imgs_list)
+    Rmean = np.zeros(N,dtype=np.uint8)
+    Rstd = Rmean.copy()
+    Gmean = Rmean.copy()
+    Gstd = Rmean.copy()
+    Bmean = Rmean.copy()
+    Bstd = Rmean.copy()
+    print(f'Finding color distribution for images in {images_dir}')
+    for idx,imfile in enumerate(imgs_list):
+        img = cv2.imread(imfile) # reads in as BGR
+        Bmean[idx] = np.mean(img[:,:,0])
+        Bstd[idx] = np.std(img[:,:,0])
+        Gmean[idx] = np.mean(img[:,:,1])
+        Gstd[idx] = np.std(img[:,:,1])
+        Rmean[idx] = np.mean(img[:,:,2])
+        Rstd[idx] = np.std(img[:,:,2])
+    config = ConfigParser()
+    config['Red'] = {'mean_of_mean': np.mean(Rmean),
+                     'std_of_mean': np.std(Rmean),
+                     'mean_of_std': np.mean(Rstd),
+                     'std_of_std': np.std(Rstd)}
+    config['Green'] = {'mean_of_mean': np.mean(Gmean),
+                     'std_of_mean': np.std(Gmean),
+                     'mean_of_std': np.mean(Gstd),
+                     'std_of_std': np.std(Gstd)}
+    config['Blue'] = {'mean_of_mean': np.mean(Bmean),
+                     'std_of_mean': np.std(Bmean),
+                     'mean_of_std': np.mean(Bstd),
+                     'std_of_std': np.std(Bstd)}
+    print(f'Saving output to {cfg_name}')
+    with open(cfg_name, 'w') as configfile:
+        config.write(configfile)
+
+def filter_by_colorspace(images_dir, cfg_name='anime_colorspace.ini', out_dir='Images/filtered-images'):
+    '''
+    This function reads through all images in a directory, 
+    and saves the ones with a colorspace that falls within the one defined by the config file.
+    INPUTS
+    images_dir - directory to non-recursively search for images within
+    cfg_name - config file created with get_colorspace()
+    out_dir - 
+    '''
+    imgs_list = files_in_dir(images_dir)
+    config = ConfigParser()
+    config.read(cfg_name)
+    for file in imgs_list:
+        img = cv2.imread(file)
+        Bmean = np.mean(img[:,:,0])
+        Bstd = np.std(img[:,:,0])
+        Gmean = np.mean(img[:,:,1])
+        Gstd = np.std(img[:,:,1])
+        Rmean = np.mean(img[:,:,2])
+        Rstd = np.std(img[:,:,2])
+
+
 
 if __name__ == '__main__':
     # list_anime_characters('Monster','Images/myanimelist-images-original')
@@ -453,5 +505,8 @@ if __name__ == '__main__':
     # image_name = 'Images/google-images-original/Robbie/Robbie_25.jpeg'
     # detector = crop_faces(image_name,cropped_dir='Images/google-images-cropped/Robbie')
     # crop_orig_imgs()
-    # crop_video_frames('Monster.S01.480p.NF.WEB-DL.DDP2.0.x264-Emmid')
-    remove_duplicates('Images/anime-frames-cropped')
+    crop_video_frames('Monster.S01.480p.NF.WEB-DL.DDP2.0.x264-Emmid')
+    # crop_video_frames('/home/redxhat/Videos/Vinland_Saga','Vinland-cropped')
+    # get_colorspace('Images/Vinland-cropped','Vinland-colorspace.ini')
+    # remove_duplicates('Images/anime-frames-cropped')
+    get_colorspace('Images/anime-frames-cropped')
