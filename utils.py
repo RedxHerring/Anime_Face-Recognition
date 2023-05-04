@@ -20,6 +20,7 @@ import shutil
 import pandas as pd
 import glob
 from configparser import ConfigParser
+from itertools import compress
 from runGoogleImagScraper import parallel_worker_threads
 
 def char_is_num(x):
@@ -204,7 +205,12 @@ def overlapped_area(a, b):  # returns intersecting area >= 0
     dy =  max(min(a[3],b[3]) - max(a[1],b[1]), 0)
     return dx*dy
 
-def crop_faces(img_name, img=None, detector=None, cropped_dir='Images/cropped-images',idx0=0,score_threshold=.3,min_dim=16,save_rect=True,save_square=True):
+def is_single_color(img):
+    if np.std(img)<5 or np.std(img)/(np.max(img) - np.min(img))<.15:
+        return True
+    return False
+
+def crop_faces(img_name="cropped_face.png", img=None, detector=None, cropped_dir='Images/cropped-images',idx0=0,score_threshold=.3,min_dim=16,save_rect=True,save_square=True):
     '''
     INPUTS
     img_name - full path to input image if img is None, or output name if img is input image
@@ -237,7 +243,7 @@ def crop_faces(img_name, img=None, detector=None, cropped_dir='Images/cropped-im
     else:
         filename = img_name
     os.makedirs(cropped_dir,exist_ok=True)
-    if np.std(img)<5 or np.std(img)/(np.max(img) - np.min(img))<.15: # basically one color, no features
+    if is_single_color(img): # basically one color, no features
         print("[INFO] Image is effectively single-color, skipping")
         detector = None # just in case something got wonky since it's uncharted territory
         return detector, idx0
@@ -277,6 +283,9 @@ def crop_faces(img_name, img=None, detector=None, cropped_dir='Images/cropped-im
                 elif sum(ovlp_wrt_j>max_overlap) == 1:
                     keep_rect[ovlp_wrt_j>max_overlap] = False
             coords = coords[keep_rect,:]
+            faces[1] = faces[1][keep_rect,:]
+        if not(save_rect or save_square):
+            return detector, img, faces
         # With the sorting process done, we need to remove any negative values.
         coords = np.maximum(0,coords)
         # There may still be values that are too large, but it's more convenient to sort this out within the loop
@@ -287,15 +296,17 @@ def crop_faces(img_name, img=None, detector=None, cropped_dir='Images/cropped-im
                 continue
             # First save cropped version as determined by Yunet.
             # This way we can compare the images with other cropped ones
+            x2 = x1 + w
+            if x2 > n:
+                x2 = n
+            y2 = y1 + h
+            if y2 > m:
+                y2 = m
+            imgi = img[y1:y2, x1:x2, :]
+            if is_single_color(imgi): # we check here even if we are only saving square image, as if we DO want to save both we don't want to risk only saving one
+                continue
             if save_rect:
-                x2 = x1 + w
-                if x2 > n:
-                    x2 = n
-                y2 = y1 + h
-                if y2 > m:
-                    y2 = m
-                imgi = img[y1:y2, x1:x2, :]
-                namei =  os.path.join(cropped_dir,filename+'-'+str(idx0+idx)+'.png')
+                namei =  os.path.join(cropped_dir,filename+'-rect'+str(idx0+idx)+'.png')
                 cv2.imwrite(namei,imgi)
             # Now get a square crop to use with CNN, which we can easily scale as needed.
             # Start by enlarging by 10% in all directions, to get full chin and ears, and more hair.
@@ -332,6 +343,7 @@ def crop_faces(img_name, img=None, detector=None, cropped_dir='Images/cropped-im
     return detector, idx0+idx # so we don't have to re-initialize next time
 
 def download_models():
+    # Download detection model
     link = 'https://github.com/opencv/opencv_zoo/raw/master/models/face_detection_yunet/face_detection_yunet_2022mar.onnx'
     r = requests.get(link)
     download_path = 'models'
@@ -339,26 +351,32 @@ def download_models():
     file_name = 'fd_yunet.onnx'
     with open(os.path.join(download_path, file_name), 'wb') as fd:
         fd.write(r.content)
+    # Download recognition model
+    link = 'https://github.com/opencv/opencv_zoo/raw/master/models/face_recognition_sface/face_recognition_sface_2021dec.onnx'
+    r = requests.get(link)
+    download_path = 'models'
+    file_name = 'fr_sface.onnx'
+    with open(os.path.join(download_path, file_name), 'wb') as fd:
+        fd.write(r.content)
 
 def crop_orig_imgs():
-    dirs = glob.glob('Images/*-original/*')
+    dirs = sorted(glob.glob('Images/*-original/*'))
     for dir in dirs:
         image_type = os.path.basename(os.path.dirname(dir))[0:-8]
         crop_dir = os.path.join('Images',image_type+'cropped',os.path.basename(dir))
         print(crop_dir)
         image_files = files_in_dir(dir)
         for file in image_files:
-            full_name = os.path.join(dir,file)
-            print('[INFO] Cropping ' + full_name)
-            _, idx0 = crop_faces(full_name, cropped_dir=crop_dir)
+            base_name = os.path.basename(file)
+            print('[INFO] Cropping ' + file)
+            _, idx0 = crop_faces(file, cropped_dir=crop_dir)
             if not idx0: # 0 faces were found
                 noface_dir = os.path.join('Images',image_type+'noface',os.path.basename(dir))
                 os.makedirs(noface_dir,exist_ok=True)
-                shutil.copy(os.path.join(dir,file),os.path.join(noface_dir,file))
+                shutil.copy(file,os.path.join(noface_dir,base_name))
 
-def crop_video_frames(videos_dir,out_dir='anime-frames-cropped'):
+def crop_video_frames(videos_dir,out_dir='Images/anime-frames-cropped',skip_frames=500,save_square=True,save_rect=False):
     detector = None
-    skip_frames = 5000
     video_files = files_in_dir(videos_dir,["mkv","mp4","avi","webm"])
     for Ep,file in enumerate(sorted(video_files)):
         Epstr = str(Ep+1)
@@ -392,7 +410,7 @@ def crop_video_frames(videos_dir,out_dir='anime-frames-cropped'):
                     ms = str(ms)
                     ms = '0'*(3-len(ms)) + ms
                     cropped_name = 'Ep'+Epstr+'hh'+hh+'mm'+mm+'ss'+ss+'ms'+ms
-                    detector,idx0 = crop_faces(img_name=cropped_name, img=frame, detector=detector, cropped_dir='Images/'+out_dir,score_threshold=.8,save_rect=False)
+                    detector,idx0 = crop_faces(img_name=cropped_name, img=frame, detector=detector, cropped_dir=out_dir,score_threshold=.9,save_rect=save_rect,save_square=save_square)
                     print(f'{idx0} images found for {cropped_name}')
                     fidx = 0
                 else:
@@ -456,44 +474,143 @@ def get_colorspace(images_dir,cfg_name='anime_colorspace.ini'):
         Rmean[idx] = np.mean(img[:,:,2])
         Rstd[idx] = np.std(img[:,:,2])
     config = ConfigParser()
-    config['Red'] = {'mean_of_mean': np.mean(Rmean),
-                     'std_of_mean': np.std(Rmean),
-                     'mean_of_std': np.mean(Rstd),
-                     'std_of_std': np.std(Rstd)}
-    config['Green'] = {'mean_of_mean': np.mean(Gmean),
-                     'std_of_mean': np.std(Gmean),
-                     'mean_of_std': np.mean(Gstd),
-                     'std_of_std': np.std(Gstd)}
-    config['Blue'] = {'mean_of_mean': np.mean(Bmean),
-                     'std_of_mean': np.std(Bmean),
-                     'mean_of_std': np.mean(Bstd),
-                     'std_of_std': np.std(Bstd)}
+    config['Red'] = {'mean_of_means': np.mean(Rmean),
+                     'std_of_means': np.std(Rmean),
+                     'mean_of_stds': np.mean(Rstd),
+                     'std_of_stds': np.std(Rstd)}
+    config['Green'] = {'mean_of_means': np.mean(Gmean),
+                     'std_of_means': np.std(Gmean),
+                     'mean_of_stds': np.mean(Gstd),
+                     'std_of_stds': np.std(Gstd)}
+    config['Blue'] = {'mean_of_means': np.mean(Bmean),
+                     'std_of_means': np.std(Bmean),
+                     'mean_of_stds': np.mean(Bstd),
+                     'std_of_stds': np.std(Bstd)}
     print(f'Saving output to {cfg_name}')
     with open(cfg_name, 'w') as configfile:
         config.write(configfile)
 
-def filter_by_colorspace(images_dir, cfg_name='anime_colorspace.ini', out_dir='Images/filtered-images'):
+def filter_by_colorspace(images_dir, cfg_name='anime_colorspace.ini', accepted_dir='Images/accepted-images', rejected_dir='Images/recected-images',za_thresh=1.5,zr_thresh=2.5):
     '''
     This function reads through all images in a directory, 
     and saves the ones with a colorspace that falls within the one defined by the config file.
     INPUTS
     images_dir - directory to non-recursively search for images within
-    cfg_name - config file created with get_colorspace()
-    out_dir - 
+    cfg_name - config file created with get_colorspace(). 
+    The file name will also have a special significance in determining what images it should be used to filter.
+    If 'rect' is in the file name, then the cfg file describes the colorspace of rectangular crops only.
+    Likewise, 'square' describes the distribution for square crops only. rectangular crops usually have a lower std.
+    accepted_dir - directory to save files that pass
+    rejected_dir - directory to save files that fail, not that some iamges might not end up in either
+    za_thresh - z-score threshold to determine if image passes, with all scores having to be within this bound
+    zr_thresh - z-score to determine if an image goes to rejected_dir, with one score having to surpass this bound
     '''
+    os.makedirs(accepted_dir,exist_ok=True)
+    os.makedirs(rejected_dir,exist_ok=True)
     imgs_list = files_in_dir(images_dir)
+    fnames = [os.path.basename(e) for e in imgs_list]
+    # If a search key is in the cfg name, we only want to look at images matching that key
+    if 'rect' in cfg_name:
+        mask = ['rect' in e for e in fnames]
+    elif 'square' in cfg_name:
+        mask = ['square' in e for e in imgs_list]
+    else:
+        mask = np.full((len(imgs_list)), True)
+    imgs_list = list(compress(imgs_list,mask))
+    fnames = list(compress(fnames,mask))
     config = ConfigParser()
     config.read(cfg_name)
-    for file in imgs_list:
+    print(f'[INFO] Filtering images in {images_dir} by data in {cfg_name}')
+    for idx,file in enumerate(imgs_list):
+        accepted = True
+        rejected = False
         img = cv2.imread(file)
         Bmean = np.mean(img[:,:,0])
+        z = (Bmean - float(config['Blue']['mean_of_means']))/float(config['Blue']['std_of_means'])
+        if abs(z) > za_thresh:
+            accepted = False
+            if abs(z) > zr_thresh:
+                rejected = True
         Bstd = np.std(img[:,:,0])
+        z = (Bstd - float(config['Blue']['mean_of_stds']))/float(config['Blue']['std_of_stds'])
+        if abs(z) > za_thresh:
+            accepted = False
+            if abs(z) > zr_thresh:
+                rejected = True
         Gmean = np.mean(img[:,:,1])
+        z = (Gmean - float(config['Green']['mean_of_means']))/float(config['Green']['std_of_means'])
+        if abs(z) > za_thresh:
+            accepted = False
+            if abs(z) > zr_thresh:
+                rejected = True
         Gstd = np.std(img[:,:,1])
+        z = (Gstd - float(config['Green']['mean_of_stds']))/float(config['Green']['std_of_stds'])
+        if abs(z) > za_thresh:
+            accepted = False
+            if abs(z) > zr_thresh:
+                rejected = True
         Rmean = np.mean(img[:,:,2])
+        z = (Rmean - float(config['Red']['mean_of_means']))/float(config['Red']['std_of_means'])
+        if abs(z) > za_thresh:
+            accepted = False
+            if abs(z) > zr_thresh:
+                rejected = True
         Rstd = np.std(img[:,:,2])
+        z = (Rstd - float(config['Red']['mean_of_stds']))/float(config['Red']['std_of_stds'])
+        if abs(z) > za_thresh:
+            accepted = False
+            if abs(z) > zr_thresh:
+                rejected = True
+        if accepted: # image is within all distributions
+            base_name = fnames[idx]
+            if 'rect' in cfg_name:
+                # Need to find equivalent square image
+                base_name = base_name.replace('-rect','-square')
+            full_name = os.path.join(os.path.dirname(file),base_name)
+            shutil.copy(full_name,os.path.join(accepted_dir,base_name))
+        if rejected: # image is way outside at least one distribution
+            base_name = fnames[idx]
+            if 'rect' in cfg_name:
+                # Need to find equivalent square image
+                base_name = base_name.replace('-rect','-square')
+            full_name = os.path.join(os.path.dirname(file),base_name)
+            shutil.copy(full_name,os.path.join(rejected_dir,base_name))
 
+def filter_google_images():
+    dirs = sorted(glob.glob('Images/google-images-cropped/*'))
+    for dir in dirs:
+        crop_dir = os.path.join('Images','google-images-accepted',os.path.basename(dir))
+        reject_dir = os.path.join('Images','google-images-rejected',os.path.basename(dir))
+        filter_by_colorspace(dir,cfg_name='anime_colorspace_rect.cfg',accepted_dir=crop_dir,rejected_dir=reject_dir,za_thresh=.75)
 
+def get_face_similarity(img1,img2,detector=None):
+    '''
+    This function uses cv2 face recognition to get a feature vector of two faces,
+    after which cosine similarity can be used. 
+    The detection algorithm must first be used to locate features, 
+    so it's best if the input image is a crop slightly larger than the one made by the detector,
+    i.e. the square crop
+    INPUTS
+    img1 first image (m1xn1x3)
+    img2 second image (m2xn2x3)
+    OUTPUTS
+    similarity value 0 (least similar) to 1
+    '''
+    # We feed in the iamge and return it so that the input can be an array or a file name,
+    # and the output will be an array
+    detector, img1, faces1 = crop_faces(img1,detector=detector,save_rect=False,save_square=False)
+    detector, img2, faces2 = crop_faces(img1,detector=detector,save_rect=False,save_square=False)
+    recognizer = cv2.FaceRecognizerSF.create(
+            "models/fr_scafe.onnx","")
+            
+    face1_align = recognizer.alignCrop(img1, faces1[1][0])
+    face2_align = recognizer.alignCrop(img2, faces2[1][0])
+    # Extract features
+    face1_feature = recognizer.feature(face1_align)
+    face2_feature = recognizer.feature(face2_align)
+    # Get scores
+    cosine_score = recognizer.match(face1_feature, face2_feature, cv2.FaceRecognizerSF_FR_COSINE)
+    l2_score = recognizer.match(face1_feature, face2_feature, cv2.FaceRecognizerSF_FR_NORM_L2)
 
 if __name__ == '__main__':
     # list_anime_characters('Monster','Images/myanimelist-images-original')
@@ -505,8 +622,13 @@ if __name__ == '__main__':
     # image_name = 'Images/google-images-original/Robbie/Robbie_25.jpeg'
     # detector = crop_faces(image_name,cropped_dir='Images/google-images-cropped/Robbie')
     # crop_orig_imgs()
-    crop_video_frames('Monster.S01.480p.NF.WEB-DL.DDP2.0.x264-Emmid')
+    # crop_video_frames('Monster.S01.480p.NF.WEB-DL.DDP2.0.x264-Emmid',out_dir='Images/anime-frames-cropped-rect',skip_frames=1000,save_rect=True,save_square=False)
+    # crop_video_frames('/home/redxhat/Videos/Vinland_Saga',out_dir='Images/vinland-frames-cropped-rect',skip_frames=100,save_rect=True,save_square=False)
+
     # crop_video_frames('/home/redxhat/Videos/Vinland_Saga','Vinland-cropped')
-    # get_colorspace('Images/Vinland-cropped','Vinland-colorspace.ini')
     # remove_duplicates('Images/anime-frames-cropped')
-    get_colorspace('Images/anime-frames-cropped')
+    # get_colorspace('Images/anime-frames-cropped-rect',cfg_name='monster_colorspace.ini')
+    # get_colorspace('Images/vinland-frames-cropped-rect',cfg_name='vinland_colorspace.ini')
+    # filter_by_colorspace('Images/google-images-cropped/Adolf_Junkers/',cfg_name='monster_colorspace_rect.cfg',za_thresh=1)
+    filter_google_images()
+
