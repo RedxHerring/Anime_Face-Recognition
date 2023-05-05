@@ -6,7 +6,7 @@
 *.fatbin
 *.mp4
 *.mkv
-test.*
+test*.*
 *.log
 *.onnx
 __*

@@ -12,7 +12,8 @@ import argparse
 
 
 def worker_thread(search_key,token_name):
-    image_scraper = GoogleImageScraper(images_path, search_key, number_of_images, token_name, headless, min_resolution, max_resolution, max_missed)
+    image_scraper = GoogleImageScraper(image_path=images_path, search_key=search_key, number_of_images=number_of_images, token_name=token_name, 
+                                       headless=headless, min_resolution=min_resolution, max_resolution=max_resolution, max_missed=max_missed)
     image_urls = image_scraper.find_image_urls()
     image_scraper.save_images(image_urls, keep_filenames)
     #Release resources

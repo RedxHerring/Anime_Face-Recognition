@@ -184,7 +184,7 @@ def files_in_dir(files_dir,ftypes=['png','jpg','jpeg','webp']):
     files_list = []
     for ftype in ftypes:
         files_list.extend(glob.glob(os.path.join(files_dir,'*.'+ftype)))
-    return files_list
+    return sorted(files_list)
 
 def remove_grayscale_images(anime_file,images_path=''):
     if images_path[0] != '/':
@@ -210,7 +210,7 @@ def is_single_color(img):
         return True
     return False
 
-def crop_faces(img_name="cropped_face.png", img=None, detector=None, cropped_dir='Images/cropped-images',idx0=0,score_threshold=.3,min_dim=16,save_rect=True,save_square=True):
+def crop_faces(img_name="cropped_face.png", img=None, detector=None, cropped_dir='Images/cropped-images',idx0=0,score_threshold=.3,min_dim=16,save_rect=True,save_square=True,return_faces=False):
     '''
     INPUTS
     img_name - full path to input image if img is None, or output name if img is input image
@@ -231,10 +231,16 @@ def crop_faces(img_name="cropped_face.png", img=None, detector=None, cropped_dir
             score_threshold=score_threshold,
             nms_threshold=.4
         )
+    if type(img_name) is np.ndarray: # allow for two types of inputs
+        img = img_name
+        img_name = "cropped_face.png"
     if img is None: # need to load image
         if not os.path.exists(img_name):
             print('[INFO] Image file does not exist, skipping')
-            return detector, idx0
+            if return_faces:
+                return detector,idx0,0,[[],[]]
+            else:
+                return detector, idx0
         fullname, file_extension = os.path.splitext(img_name)
         filename = os.path.basename(fullname)
         character_name = os.path.basename(os.path.dirname(filename))
@@ -242,11 +248,15 @@ def crop_faces(img_name="cropped_face.png", img=None, detector=None, cropped_dir
         img = cv2.imread(img_name)
     else:
         filename = img_name
-    os.makedirs(cropped_dir,exist_ok=True)
-    if is_single_color(img): # basically one color, no features
-        print("[INFO] Image is effectively single-color, skipping")
-        detector = None # just in case something got wonky since it's uncharted territory
-        return detector, idx0
+    if save_rect or save_square:
+        os.makedirs(cropped_dir,exist_ok=True)
+        if is_single_color(img): # basically one color, no features
+            print("[INFO] Image is effectively single-color, skipping")
+            detector = None # just in case something got wonky since it's uncharted territory
+            if return_faces:
+                return detector,idx0,0,[[],[]]
+            else:
+                return detector, idx0
     m,n,_ = img.shape
     detector.setInputSize((n,m))
     try:
@@ -254,7 +264,10 @@ def crop_faces(img_name="cropped_face.png", img=None, detector=None, cropped_dir
     except: # The image is simply too hot to handle, this is a rare bug
         print("[INFO] Image detect failed, skipping")
         detector = None # just in case something got wonky since it's uncharted territory
-        return detector, idx0
+        if return_faces:
+            return detector,idx0,0,[[],[]]
+        else:
+            return detector, idx0
     idx = 0 # initialize in case the for loop is skipped
     if faces[1] is not None:
         # First we need to check for and remove cases of boxes within boxes.
@@ -283,9 +296,9 @@ def crop_faces(img_name="cropped_face.png", img=None, detector=None, cropped_dir
                 elif sum(ovlp_wrt_j>max_overlap) == 1:
                     keep_rect[ovlp_wrt_j>max_overlap] = False
             coords = coords[keep_rect,:]
-            faces[1] = faces[1][keep_rect,:]
-        if not(save_rect or save_square):
-            return detector, img, faces
+            faces = list(faces) # convert to list so we can assign values
+            faces[1] = faces[1][keep_rect]
+            faces = tuple(faces)
         # With the sorting process done, we need to remove any negative values.
         coords = np.maximum(0,coords)
         # There may still be values that are too large, but it's more convenient to sort this out within the loop
@@ -340,7 +353,10 @@ def crop_faces(img_name="cropped_face.png", img=None, detector=None, cropped_dir
                 imgs = img[y1:y1+hs, x1:x1+ws, :]
                 names =  os.path.join(cropped_dir,filename+'-square'+str(idx0+idx)+'.png')
                 cv2.imwrite(names,imgs)
-    return detector, idx0+idx # so we don't have to re-initialize next time
+    if return_faces:
+        return detector,idx0+idx,img,faces
+    else:
+        return detector, idx0+idx # so we don't have to re-initialize next time
 
 def download_models():
     # Download detection model
@@ -359,26 +375,10 @@ def download_models():
     with open(os.path.join(download_path, file_name), 'wb') as fd:
         fd.write(r.content)
 
-def crop_orig_imgs():
-    dirs = sorted(glob.glob('Images/*-original/*'))
-    for dir in dirs:
-        image_type = os.path.basename(os.path.dirname(dir))[0:-8]
-        crop_dir = os.path.join('Images',image_type+'cropped',os.path.basename(dir))
-        print(crop_dir)
-        image_files = files_in_dir(dir)
-        for file in image_files:
-            base_name = os.path.basename(file)
-            print('[INFO] Cropping ' + file)
-            _, idx0 = crop_faces(file, cropped_dir=crop_dir)
-            if not idx0: # 0 faces were found
-                noface_dir = os.path.join('Images',image_type+'noface',os.path.basename(dir))
-                os.makedirs(noface_dir,exist_ok=True)
-                shutil.copy(file,os.path.join(noface_dir,base_name))
-
 def crop_video_frames(videos_dir,out_dir='Images/anime-frames-cropped',skip_frames=500,save_square=True,save_rect=False):
     detector = None
     video_files = files_in_dir(videos_dir,["mkv","mp4","avi","webm"])
-    for Ep,file in enumerate(sorted(video_files)):
+    for Ep,file in enumerate(video_files):
         Epstr = str(Ep+1)
         if len(Epstr) == 1:
             Epstr = '0' + Epstr
@@ -511,9 +511,9 @@ def filter_by_colorspace(images_dir, cfg_name='anime_colorspace.ini', accepted_d
     fnames = [os.path.basename(e) for e in imgs_list]
     # If a search key is in the cfg name, we only want to look at images matching that key
     if 'rect' in cfg_name:
-        mask = ['rect' in e for e in fnames]
+        mask = ['-rect' in e for e in fnames]
     elif 'square' in cfg_name:
-        mask = ['square' in e for e in imgs_list]
+        mask = ['-square' in e for e in imgs_list]
     else:
         mask = np.full((len(imgs_list)), True)
     imgs_list = list(compress(imgs_list,mask))
@@ -576,13 +576,6 @@ def filter_by_colorspace(images_dir, cfg_name='anime_colorspace.ini', accepted_d
             full_name = os.path.join(os.path.dirname(file),base_name)
             shutil.copy(full_name,os.path.join(rejected_dir,base_name))
 
-def filter_google_images():
-    dirs = sorted(glob.glob('Images/google-images-cropped/*'))
-    for dir in dirs:
-        crop_dir = os.path.join('Images','google-images-accepted',os.path.basename(dir))
-        reject_dir = os.path.join('Images','google-images-rejected',os.path.basename(dir))
-        filter_by_colorspace(dir,cfg_name='anime_colorspace_rect.cfg',accepted_dir=crop_dir,rejected_dir=reject_dir,za_thresh=.75)
-
 def get_face_similarity(img1,img2,detector=None):
     '''
     This function uses cv2 face recognition to get a feature vector of two faces,
@@ -591,17 +584,17 @@ def get_face_similarity(img1,img2,detector=None):
     so it's best if the input image is a crop slightly larger than the one made by the detector,
     i.e. the square crop
     INPUTS
-    img1 first image (m1xn1x3)
-    img2 second image (m2xn2x3)
+    img1 first image (m1xn1x3) or path or image
+    img2 second image (m2xn2x3) or path to image
     OUTPUTS
     similarity value 0 (least similar) to 1
     '''
     # We feed in the iamge and return it so that the input can be an array or a file name,
     # and the output will be an array
-    detector, img1, faces1 = crop_faces(img1,detector=detector,save_rect=False,save_square=False)
-    detector, img2, faces2 = crop_faces(img1,detector=detector,save_rect=False,save_square=False)
+    detector, img1, faces1 = crop_faces(img_name=img1,detector=detector,save_rect=False,save_square=False)
+    detector, img2, faces2 = crop_faces(img_name=img2,detector=detector,save_rect=False,save_square=False)
     recognizer = cv2.FaceRecognizerSF.create(
-            "models/fr_scafe.onnx","")
+            "models/fr_sface.onnx","")
             
     face1_align = recognizer.alignCrop(img1, faces1[1][0])
     face2_align = recognizer.alignCrop(img2, faces2[1][0])
@@ -611,10 +604,90 @@ def get_face_similarity(img1,img2,detector=None):
     # Get scores
     cosine_score = recognizer.match(face1_feature, face2_feature, cv2.FaceRecognizerSF_FR_COSINE)
     l2_score = recognizer.match(face1_feature, face2_feature, cv2.FaceRecognizerSF_FR_NORM_L2)
+    return cosine_score, l2_score, detector
+
+def crop_orig_imgs(images_dir_top='Images/google-images-original', accepted_dir_top='Images/accepted-images', rejected_dir_top='Images/recected-images',a_thresh=.7,r_thresh=.2):
+    dirs = sorted(glob.glob(os.path.join(images_dir_top,'*')))
+    recognizer = cv2.FaceRecognizerSF.create("models/fr_sface.onnx","")
+    detector = None # initialize
+    for dir in dirs:
+        # Get name of file from myanimelist that we can definitively trust to be the right character
+        img1_name = glob.glob(os.path.join(dir.replace('google','myanimelist'),'*'))[0]
+        character_name = os.path.basename(dir)
+        # Make all directories possibly needed
+        accepted_dir = os.path.join(accepted_dir_top,character_name)
+        os.makedirs(accepted_dir,exist_ok=True)
+        rejected_dir = os.path.join(rejected_dir_top,character_name)
+        os.makedirs(rejected_dir,exist_ok=True)
+        noface_dir = os.path.join('Images','google-images-noface',character_name)
+        os.makedirs(noface_dir,exist_ok=True)
+        # Now run detection on myanimelist image to get a baseline.
+        detector, idx0, img1, faces1 = crop_faces(img_name=img1_name,detector=detector,cropped_dir=accepted_dir,save_rect=False,save_square=True,return_faces=True)
+        face1_align = recognizer.alignCrop(img1, faces1[1][0])
+        # Extract features
+        face1_feature = recognizer.feature(face1_align)
+        # Now get similar faces from google images
+        imgs_list = files_in_dir(dir)
+        # Loop through google images for current character
+        for file in imgs_list:
+            crop_dir = os.path.join('Images','google-images-cropped',os.path.basename(dir))
+            detector, idx0, img2, faces2 = crop_faces(img_name=file,detector=detector,cropped_dir=crop_dir,return_faces=True)
+            if idx0:
+                for face in faces2[1]:
+                    face2_align = recognizer.alignCrop(img2, face)
+                    # Extract features
+                    face2_feature = recognizer.feature(face2_align)
+                    # Get scores
+                    cosine_score = recognizer.match(face1_feature, face2_feature, cv2.FaceRecognizerSF_FR_COSINE)
+                    l2_score = recognizer.match(face1_feature, face2_feature, cv2.FaceRecognizerSF_FR_NORM_L2)
+                    if cosine_score > a_thresh: # image passes
+                        shutil.copy(file,os.path.join(accepted_dir,os.path.basename(file)))
+                    elif cosine_score < r_thresh: # image is definitely not the same person
+                        shutil.copy(file,os.path.join(rejected_dir,os.path.basename(file)))
+            else:
+                
+                shutil.copy(file,os.path.join(noface_dir,os.path.basename(file)))
+
+
+def filter_by_similarity(images_dir, accepted_dir='Images/accepted-images', rejected_dir='Images/recected-images',a_thresh=.9,r_thresh=.2):
+    '''
+    This function reads through all images in a directory, and saves the ones with close facial features.
+    INPUTS
+    images_dir - directory to non-recursively search for images within
+    accepted_dir - directory to save files that pass
+    rejected_dir - directory to save files that fail, not that some iamges might not end up in either
+    a_thresh - cosine similarity threshold to determine if image passes, with the score having to be above this bound.
+    r_thresh - cosine similarity to determine if an image goes to rejected_dir, with the score having to be below this bound.
+    '''
+    os.makedirs(accepted_dir,exist_ok=True)
+    os.makedirs(rejected_dir,exist_ok=True)
+    imgs_list = files_in_dir(images_dir)
+    mask = ['-square' in e for e in imgs_list]
+    imgs_list = sorted(list(compress(imgs_list,mask)))
+    # Get name of file from myanimelist that we can definitively trust to be the right character
+    img1_name = glob.glob(os.path.join('Images/myanimelist-images-original',os.path.basename(images_dir),'*'))[0]
+    print(f'[INFO] Filtering images in {images_dir} by cosine similarity to {img1_name}')
+    detector = None
+    for file in imgs_list:
+        cosine_score,_,detector = get_face_similarity(img1_name,file,detector=detector)
+        if cosine_score > a_thresh: # image passes
+            shutil.copy(file,os.path.join(accepted_dir,os.path.basename(file)))
+        elif cosine_score < r_thresh: # image is definitely not the same person
+            shutil.copy(file,os.path.join(rejected_dir,os.path.basename(file)))
+
+def filter_google_images():
+    dirs = sorted(glob.glob('Images/google-images-cropped/*'))
+    for dir in dirs:
+        crop_dir = os.path.join('Images','google-images-accepted',os.path.basename(dir))
+        reject_dir = os.path.join('Images','google-images-rejected',os.path.basename(dir))
+        # filter_by_colorspace(dir,cfg_name='anime_colorspace_rect.cfg',accepted_dir=crop_dir,rejected_dir=reject_dir,za_thresh=.75)
+        filter_by_similarity(dir,accepted_dir=crop_dir,rejected_dir=reject_dir)
+
+
 
 if __name__ == '__main__':
     # list_anime_characters('Monster','Images/myanimelist-images-original')
-    # get_character_images("Monster-Characters.csv",'Images/google-images')
+    get_character_images("Monster-Characters.csv",'Images/google-images-original2')
     # load_image('Images/google-images/Adolf_Junkers/Adolf_Junkers_0.webp')
     # remove_grayscale_images("Monster-Characters.csv",'Images/google-images')
     # check_gray('Images/google-images/Anna_Liebert/')
@@ -630,5 +703,5 @@ if __name__ == '__main__':
     # get_colorspace('Images/anime-frames-cropped-rect',cfg_name='monster_colorspace.ini')
     # get_colorspace('Images/vinland-frames-cropped-rect',cfg_name='vinland_colorspace.ini')
     # filter_by_colorspace('Images/google-images-cropped/Adolf_Junkers/',cfg_name='monster_colorspace_rect.cfg',za_thresh=1)
-    filter_google_images()
+    # filter_google_images()
 

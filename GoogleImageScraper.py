@@ -58,13 +58,13 @@ class GoogleImageScraper():
     # Load or reload full page
     def loadnscroll(self,class_name):
         print(f"[INFO] Loading {self.url}")
-        max_wait_time = 5 # time to wait for images to load, in seconds
+        max_wait_time = 4 # time to wait for images to load, in seconds
         self.driver.get(self.url)
         WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, class_name)))
         elems = self.driver.find_elements(By.CLASS_NAME,class_name) # Find images in page
         Le = len(elems)
         loaded_more = False
-        while Le < self.number_of_images:
+        while Le < self.number_of_images*1.2: # add buffer since images will be filtered out later
             self.driver.execute_script("window.scrollTo(0,document.body.scrollHeight)")
             WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, class_name)))
             elems = self.driver.find_elements(By.CLASS_NAME,class_name) # Find images in page
@@ -123,7 +123,6 @@ class GoogleImageScraper():
         sim_thresh = .5
         idx = 0
         winlen = min(25,Le)
-        side_img_class_name = 'pT0Scc'
         nskips = 0
         have_reloaded = False
         while idx < Le:
@@ -135,9 +134,9 @@ class GoogleImageScraper():
                     WebDriverWait(self.driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, "l39u4d")))
                     side_bar = self.driver.find_element(By.CLASS_NAME,'l39u4d')
                     try:
-                        dfimg.at[idx,'url'] = side_bar.find_element(By.CLASS_NAME,side_img_class_name).get_attribute('src')
+                        dfimg.at[idx,'url'] = side_bar.find_element(By.CLASS_NAME,'r48jcc.pT0Scc.iPVvYb').get_attribute('src')
                     except:
-                        dfimg.at[idx,'url'] = side_bar.find_element(By.CLASS_NAME,side_img_class_name).get_attribute('src')
+                        dfimg.at[idx,'url'] = side_bar.find_element(By.CLASS_NAME,'pT0Scc').get_attribute('src')
                     print(f"[INFO] {self.search_key} \t #{idx} \t {dfimg['url'][idx]}")
                     dfimg.at[idx,'title'] = side_bar.text.split('\n')[1]
                     if len(dfimg['title'][idx]) == 0:
@@ -170,8 +169,9 @@ class GoogleImageScraper():
         # Keep all links that are above the threshold or are surrounded by links above the threshold, except for 0s removed due to content words
         keep_rows = np.logical_and(np.logical_or(dfimg["similarity"]>sim_thresh, simoothed>sim_thresh), dfimg["similarity"]>0)
         image_urls = list(compress(dfimg['url'].to_list(),keep_rows))
+        unique_urls = list(set(image_urls)) # sets remove any duplicates
         print("[INFO] Google search ended")
-        return list(set(image_urls)) # sets remove any duplicates
+        return unique_urls[0:min(len(unique_urls)-1,self.number_of_images)]
 
     def save_images(self,image_urls, keep_filenames):
         some_failed = False
@@ -184,7 +184,7 @@ class GoogleImageScraper():
                 google_image_scraper.save_images(image_urls)
 
         """
-        num_digits = np.ceil(np.log10(self.number_of_images))
+        num_digits = int(np.ceil(np.log10(self.number_of_images)))
         print("[INFO] Saving images, please wait...")
         for indx,image_url in enumerate(image_urls):
             try:
