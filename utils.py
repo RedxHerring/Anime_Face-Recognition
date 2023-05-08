@@ -726,6 +726,26 @@ def filter_google_images():
         # filter_by_colorspace(dir,cfg_name='anime_colorspace_rect.cfg',accepted_dir=crop_dir,rejected_dir=reject_dir,za_thresh=.75)
         filter_by_similarity(dir,accepted_dir=crop_dir,rejected_dir=reject_dir)
 
+def create_unlabeled_set(in_dir='Images/anime-frames-cropped',out_dir="Images/dataset-unlabeled",imres=(96,96)):
+    '''
+    This function loops through square iamges found by cropping faces out of the anime, 
+    and resizes them so that they can be fed into a CNN.
+    It also creates a histogram of the color pallette used.
+    INPUTS
+    in_dir - directory with cropped faces from anime, needs square crops, may include rect crops that will be ignored
+    out_dir - directory for saving uniformly-shaped images
+    imres - resolution to resize all images to
+    '''
+    imgs_list = glob.glob(os.path.join(in_dir,"*-square*"))
+    os.makedirs(out_dir,exist_ok=True)
+    print(f"Resizing square images in {in_dir} to save in {out_dir}")
+    imgs = []
+    for file in imgs_list:
+        img = cv2.resize(cv2.imread(file),imres)
+        cv2.imwrite(os.path.join(out_dir,os.path.basename(file)),img)
+        imgs.append(img)
+    hist = cv2.calcHist(imgs,channels=[0,1,2],mask=None,histSize=[256],ranges=[0,256])
+
 
 
 if __name__ == '__main__':
@@ -737,8 +757,8 @@ if __name__ == '__main__':
     # download_models()
     # image_name = 'Images/google-images-original/Robbie/Robbie_25.jpeg'
     # detector = crop_faces(image_name,cropped_dir='Images/google-images-cropped/Robbie')
-    crop_orig_imgs(a_thresh=.01)
-    # crop_video_frames('Monster.S01.480p.NF.WEB-DL.DDP2.0.x264-Emmid',out_dir='Images/anime-frames-cropped-rect',skip_frames=1000,save_rect=True,save_square=False)
+    # crop_orig_imgs(a_thresh=.01)
+    # crop_video_frames('Monster.S01.480p.NF.WEB-DL.DDP2.0.x264-Emmid',out_dir='Images/anime-frames-cropped-rect',skip_frames=1000,save_rect=True,save_square=True)
     # crop_video_frames('/home/redxhat/Videos/Vinland_Saga',out_dir='Images/vinland-frames-cropped-rect',skip_frames=100,save_rect=True,save_square=False)
 
     # crop_video_frames('/home/redxhat/Videos/Vinland_Saga','Vinland-cropped')
@@ -747,4 +767,5 @@ if __name__ == '__main__':
     # get_colorspace('Images/vinland-frames-cropped-rect',cfg_name='vinland_colorspace.ini')
     # filter_by_colorspace('Images/google-images-cropped/Adolf_Junkers/',cfg_name='monster_colorspace_rect.cfg',za_thresh=1)
     # filter_google_images()
+    create_unlabeled_set()
 
