@@ -744,7 +744,12 @@ def create_unlabeled_set(in_dir='Images/anime-frames-cropped',out_dir="Images/da
         img = cv2.resize(cv2.imread(file),imres)
         cv2.imwrite(os.path.join(out_dir,os.path.basename(file)),img)
         imgs.append(img)
-    hist = cv2.calcHist(imgs,channels=[0,1,2],mask=None,histSize=[256],ranges=[0,256])
+        lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
+    nimages = len(imgs)
+    channels = [0,1,2]*nimages
+    hist_sizes = [16,16,16]*nimages
+    ranges = [0,256]*3*nimages
+    hist = cv2.calcHist(imgs,channels=channels,mask=None,histSize=hist_sizes,ranges=ranges)
 
 
 
