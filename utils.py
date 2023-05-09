@@ -206,7 +206,10 @@ def overlapped_area(a, b):  # returns intersecting area >= 0
     return dx*dy
 
 def is_single_color(img):
-    if np.std(img)<5 or np.std(img)/(np.max(img) - np.min(img))<.1:
+    try:
+        if np.std(img)<5 or np.std(img)/(np.max(img) - np.min(img))<.1:
+            return True
+    except: # something weird happened
         return True
     return False
 
@@ -396,7 +399,7 @@ def download_models():
     with open(os.path.join(download_path, file_name), 'wb') as fd:
         fd.write(r.content)
 
-def crop_video_frames(videos_dir,out_dir='Images/anime-frames-cropped',skip_frames=500,save_square=True,save_rect=False):
+def crop_video_frames(videos_dir,out_dir='Images/anime-frames-cropped',skip_frames=500,save_square=True,save_rect=False,imres=(96,96)):
     detector = None
     video_files = files_in_dir(videos_dir,["mkv","mp4","avi","webm"])
     for Ep,file in enumerate(video_files):
@@ -431,7 +434,7 @@ def crop_video_frames(videos_dir,out_dir='Images/anime-frames-cropped',skip_fram
                     ms = str(ms)
                     ms = '0'*(3-len(ms)) + ms
                     cropped_name = 'Ep'+Epstr+'hh'+hh+'mm'+mm+'ss'+ss+'ms'+ms
-                    detector,idx0 = crop_faces(img_name=cropped_name, img=frame, detector=detector, cropped_dir=out_dir,score_threshold=.9,save_rect=save_rect,save_square=save_square)
+                    detector,idx0 = crop_faces(img_name=cropped_name, img=frame, detector=detector, cropped_dir=out_dir,score_threshold=.9,save_rect=save_rect,save_square=save_square,imres=imres)
                     print(f'{idx0} images found for {cropped_name}')
                     fidx = 0
                 else:
@@ -772,43 +775,20 @@ def get_not_this_anime_(anime_file,imres=(96,96)):
                             maxmissed=1000,reject_strs=reject_strs,simthresh=.3)
     imgs_list = files_in_dir("Images/other_anime-original")
     other_anime_data_dir = os.path.join("Images","dataset-other_anime")
-    os.makedirs(other_anime_data_dir,exist_ok=True)
+    print(f"Generating dataset of other anime faces in {other_anime_data_dir}.")
     for file in imgs_list:
-        detector, idx0, img, faces, cropped_faces  = crop_faces(img_name=file,cropped_dir="Images/other_anime-cropped",score_threshold=.9,save_rect=False,imres=imres)
-        if idx0:
-            fullfile,ext = os.path.splitext(file)
-            Nimg = len(cropped_faces)
-            num_digits = int(np.ceil(np.log10(Nimg)))
-            for idx in range(Nimg):
-                idxstr = str(idx)
-                idxstr = '0'*(num_digits-len(idxstr)) + idxstr
-                out_name = os.path.basename(fullfile)+'_'+idxstr+ext
-                img = cv2.resize(cropped_faces[idx],imres) # resize square image
-                cv2.imwrite(os.path.join(other_anime_data_dir,out_name),img)
+        crop_faces(img_name=file,cropped_dir=other_anime_data_dir,score_threshold=.9,save_rect=False,imres=imres)
     # Delete unneded directories, and in doing so remove any potentially problematic images.
     shutil.rmtree("Images/other_anime-original")
-    shutil.rmtree("Images/other_anime-cropped")
     # Get dataset of irl faces that definitely won't be our anime
     parallel_worker_threads(search_keys="people's faces",token_names="people_faces",imgs_path="Images/not_anime-original",num_images=500,simthresh=.2)
     imgs_list = files_in_dir("Images/not_anime-original")
     not_anime_data_dir = os.path.join("Images","dataset-not_anime")
-    os.makedirs(not_anime_data_dir,exist_ok=True)
+    print(f"Generating dataset of non-anime faces in {not_anime_data_dir}.")
     for file in imgs_list:
-        detector, idx0, img, faces, cropped_faces  = crop_faces(img_name=file,cropped_dir="Images/not_anime-cropped",score_threshold=.9,save_rect=False,return_faces=True)
-        if idx0:
-            fullfile,ext = os.path.splitext(file)
-            Nimg = len(cropped_faces)
-            num_digits = int(np.ceil(np.log10(Nimg)))
-            for idx in range(Nimg):
-                idxstr = str(idx)
-                idxstr = '0'*(num_digits-len(idxstr)) + idxstr
-                out_name = os.path.basename(fullfile)+'_'+idxstr+ext
-                img = cv2.resize(cropped_faces[idx],imres) # resize square image
-                cv2.imwrite(os.path.join(not_anime_data_dir,out_name),img)
+        crop_faces(img_name=file,cropped_dir=not_anime_data_dir,score_threshold=.9,save_rect=False,imres=imres)
     # Delete unneded directories, and in doing so remove any potentially problematic images.
     shutil.rmtree("Images/not_anime-original")
-    shutil.rmtree("Images/not_anime-cropped")
-
 
 
 if __name__ == '__main__':
@@ -821,7 +801,7 @@ if __name__ == '__main__':
     # image_name = 'Images/google-images-original/Robbie/Robbie_25.jpeg'
     # detector = crop_faces(image_name,cropped_dir='Images/google-images-cropped/Robbie')
     # crop_orig_imgs(a_thresh=.01)
-    # crop_video_frames('Monster.S01.480p.NF.WEB-DL.DDP2.0.x264-Emmid',out_dir='Images/anime-frames-cropped-rect',skip_frames=1000,save_rect=True,save_square=True)
+    crop_video_frames('Monster.S01.480p.NF.WEB-DL.DDP2.0.x264-Emmid',out_dir='Images/dataset-this_anime',skip_frames=1000,save_rect=False,save_square=True)
     # crop_video_frames('/home/redxhat/Videos/Vinland_Saga',out_dir='Images/vinland-frames-cropped-rect',skip_frames=100,save_rect=True,save_square=False)
 
     # crop_video_frames('/home/redxhat/Videos/Vinland_Saga','Vinland-cropped')
@@ -831,5 +811,5 @@ if __name__ == '__main__':
     # filter_by_colorspace('Images/google-images-cropped/Adolf_Junkers/',cfg_name='monster_colorspace_rect.cfg',za_thresh=1)
     # filter_google_images()
     # create_unlabeled_set()
-    get_not_this_anime_("Monster-Characters.csv")
+    # get_not_this_anime_("Monster-Characters.csv")
 
