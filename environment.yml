@@ -222,7 +222,6 @@ dependencies:
       - watchdog==3.0.0
       - webdriver-manager==3.8.6
       - werkzeug==2.2.3
-      - wget==3.2
       - wrapt==1.14.1
       - wsproto==1.2.0
       - xtcocotools==1.13

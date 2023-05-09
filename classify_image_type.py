@@ -31,7 +31,7 @@ datagen = ImageDataGenerator(
 
 # Load and preprocess the dataset
 batch_size = 32
-train_data_dir = 'Images/dataset'
+train_data_dir = 'datasets'
 train_generator = datagen.flow_from_directory(
     train_data_dir,
     target_size=(96, 96),

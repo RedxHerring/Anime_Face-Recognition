@@ -774,7 +774,7 @@ def get_not_this_anime_(anime_file,imres=(96,96)):
     parallel_worker_threads(search_keys="anime characters",token_names="anime_characters",imgs_path="Images/other_anime-original",num_images=500,
                             maxmissed=1000,reject_strs=reject_strs,simthresh=.3)
     imgs_list = files_in_dir("Images/other_anime-original")
-    other_anime_data_dir = os.path.join("Images","dataset-other_anime")
+    other_anime_data_dir = os.path.join("datasets","other_anime")
     print(f"Generating dataset of other anime faces in {other_anime_data_dir}.")
     for file in imgs_list:
         crop_faces(img_name=file,cropped_dir=other_anime_data_dir,score_threshold=.9,save_rect=False,imres=imres)
@@ -783,7 +783,7 @@ def get_not_this_anime_(anime_file,imres=(96,96)):
     # Get dataset of irl faces that definitely won't be our anime
     parallel_worker_threads(search_keys="people's faces",token_names="people_faces",imgs_path="Images/not_anime-original",num_images=500,simthresh=.2)
     imgs_list = files_in_dir("Images/not_anime-original")
-    not_anime_data_dir = os.path.join("Images","dataset-not_anime")
+    not_anime_data_dir = os.path.join("datasets","not_anime")
     print(f"Generating dataset of non-anime faces in {not_anime_data_dir}.")
     for file in imgs_list:
         crop_faces(img_name=file,cropped_dir=not_anime_data_dir,score_threshold=.9,save_rect=False,imres=imres)
@@ -801,7 +801,7 @@ if __name__ == '__main__':
     # image_name = 'Images/google-images-original/Robbie/Robbie_25.jpeg'
     # detector = crop_faces(image_name,cropped_dir='Images/google-images-cropped/Robbie')
     # crop_orig_imgs(a_thresh=.01)
-    crop_video_frames('Monster.S01.480p.NF.WEB-DL.DDP2.0.x264-Emmid',out_dir='Images/dataset-this_anime',skip_frames=1000,save_rect=False,save_square=True)
+    crop_video_frames('Monster.S01.480p.NF.WEB-DL.DDP2.0.x264-Emmid',out_dir='datasets/this_anime',skip_frames=1000,save_rect=False,save_square=True)
     # crop_video_frames('/home/redxhat/Videos/Vinland_Saga',out_dir='Images/vinland-frames-cropped-rect',skip_frames=100,save_rect=True,save_square=False)
 
     # crop_video_frames('/home/redxhat/Videos/Vinland_Saga','Vinland-cropped')
