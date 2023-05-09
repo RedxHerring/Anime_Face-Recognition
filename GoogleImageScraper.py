@@ -19,8 +19,7 @@ from datetime import datetime
 from urllib.parse import urlparse
 import os
 import requests
-import io
-from PIL import Image
+import cv2
 from sentence_transformers import SentenceTransformer
 import numpy as np
 import pandas as pd
@@ -28,7 +27,8 @@ from itertools import compress
 
 
 class GoogleImageScraper():
-    def __init__(self, image_path, search_key="cat", number_of_images=1, token_name="cat", driver=None, headless=True, min_resolution=(0, 0), max_resolution=(1920, 1080), max_missed=10):
+    def __init__(self, image_path, search_key="cat", number_of_images=1, token_name="cat", driver=None, headless=True, 
+                 min_resolution=(0, 0), max_resolution=(1920, 1080), max_missed=10,reject_strings=None,sim_thresh = .5):
         #check parameter types
         if (type(number_of_images)!=int):
             print("[Error] Number of images must be integer value.")
@@ -54,6 +54,12 @@ class GoogleImageScraper():
         self.min_resolution = min_resolution
         self.max_resolution = max_resolution
         self.max_missed = max_missed
+        # Also make a list of strings to check for in image titles to remove fanart, etc
+        if reject_strings is None:
+            self.reject_strings = ["danbooru","cosplay","poster","wallpaper","stl"]
+        else:
+            self.reject_strings = reject_strings
+        self.sim_thresh = sim_thresh
 
     # Load or reload full page
     def loadnscroll(self,class_name):
@@ -108,9 +114,6 @@ class GoogleImageScraper():
         # Load the pre-trained model
         model = SentenceTransformer('stsb-mpnet-base-v2')
 
-        # Also make a list of strings to check for in image titles to remove fanart, etc
-        reject_strings = ["danbooru","cosplay","poster","wallpaper","stl"]
-
         print("[INFO] Gathering image links")
 
         sentence1_emb = model.encode(self.search_key.lower(), show_progress_bar=False)
@@ -120,7 +123,6 @@ class GoogleImageScraper():
         dfimg = pd.DataFrame({'url': [''] * Le,
                               'title': [''] * Le,
                               'similarity': [0] * Le})
-        sim_thresh = .5
         idx = 0
         winlen = min(25,Le)
         nskips = 0
@@ -144,7 +146,7 @@ class GoogleImageScraper():
                     # Now we compare the title to the search prompt with a large language model to evaluate the similarity
                     sentence2_emb = model.encode(dfimg['title'][idx], show_progress_bar=False)
                     sentence2_emb = sentence2_emb/np.sqrt(np.sum(sentence2_emb**2))
-                    if any(rjstr in dfimg['title'][idx] for rjstr in reject_strings):
+                    if any(rjstr in dfimg['title'][idx] for rjstr in self.reject_strings):
                         dfimg.at[idx,'similarity'] = 0 # not looking for content with this string in its title
                         print("[Info] Image rejected due to rejected content in image title.")
                     else:   
@@ -167,7 +169,7 @@ class GoogleImageScraper():
         self.driver.quit()
         dfimg.to_csv(os.path.join(self.image_path,self.token_name+'-results.csv'))
         # Keep all links that are above the threshold or are surrounded by links above the threshold, except for 0s removed due to content words
-        keep_rows = np.logical_and(np.logical_or(dfimg["similarity"]>sim_thresh, simoothed>sim_thresh), dfimg["similarity"]>0)
+        keep_rows = np.logical_and(np.logical_or(dfimg["similarity"]>self.sim_thresh, simoothed>self.sim_thresh), dfimg["similarity"]>0)
         image_urls = list(compress(dfimg['url'].to_list(),keep_rows))
         unique_urls = list(set(image_urls)) # sets remove any duplicates
         print("[INFO] Google search ended")
@@ -189,37 +191,28 @@ class GoogleImageScraper():
         for indx,image_url in enumerate(image_urls):
             try:
                 print("[INFO] Image url:%s"%(image_url))
-                search_string = ''.join(e for e in self.search_key if e.isalnum())
-                image = requests.get(image_url,timeout=5)
-                if image.status_code == 200:
-                    with Image.open(io.BytesIO(image.content)) as image_from_web:
-                        try:
-                            if (keep_filenames):
-                                #extact filename without extension from URL
-                                o = urlparse(image_url)
-                                image_url = o.scheme + "://" + o.netloc + o.path
-                                name = os.path.splitext(os.path.basename(image_url))[0]
-                                #join filename and extension
-                                filename = "%s.%s"%(name,image_from_web.format.lower())
-                            else:
-                                indxstr = str(indx)
-                                indxstr = '0'*(num_digits-len(indxstr)) + indxstr
-                                filename = "%s_%s.%s"%(self.token_name,indxstr,image_from_web.format.lower())
-
-                            image_path = os.path.join(self.image_path, filename)
-                            print(
-                                f"[INFO] {self.search_key} \t {indx} \t Image saved at: {image_path}")
-                            image_from_web.save(image_path)
-                        except OSError:
-                            rgb_im = image_from_web.convert('RGB')
-                            rgb_im.save(image_path)
-                        image_resolution = image_from_web.size
-                        if image_resolution != None:
-                            if image_resolution[0]<self.min_resolution[0] or image_resolution[1]<self.min_resolution[1] or image_resolution[0]>self.max_resolution[0] or image_resolution[1]>self.max_resolution[1]:
-                                image_from_web.close()
-                                os.remove(image_path)
-
-                        image_from_web.close()
+                r = requests.get(image_url,timeout=5)
+                if r.status_code == 200:
+                    if keep_filenames:
+                        #extact filename without extension from URL
+                        o = urlparse(image_url)
+                        image_url = o.scheme + "://" + o.netloc + o.path
+                        name = os.path.splitext(os.path.basename(image_url))[0]
+                        #join filename and extension
+                        filename = "%s.png"%(name)
+                    else:
+                        indxstr = str(indx)
+                        indxstr = '0'*(num_digits-len(indxstr)) + indxstr
+                        filename = "%s_%s.png"%(self.token_name,indxstr)
+                    image_path = os.path.join(self.image_path, filename)
+                    with open(image_path, 'wb') as fd:
+                        fd.write(r.content)
+                        print(f"[INFO] {self.search_key} \t {indx} \t Image saved at: {image_path}")
+                    img = cv2.imread(image_path)
+                    image_resolution = img.size
+                    if image_resolution != None:
+                        if image_resolution[0]<self.min_resolution[0] or image_resolution[1]<self.min_resolution[1] or image_resolution[0]>self.max_resolution[0] or image_resolution[1]>self.max_resolution[1]:
+                            os.remove(image_path)
             except Exception as e:
                 print("[ERROR] Download failed: ",e)
                 some_failed = True

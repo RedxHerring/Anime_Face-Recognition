@@ -210,7 +210,8 @@ def is_single_color(img):
         return True
     return False
 
-def crop_faces(img_name="cropped_face.png", img=None, detector=None, cropped_dir='Images/cropped-images',idx0=0,score_threshold=.3,min_dim=16,save_rect=True,save_square=True,return_faces=False,do_filtering=True):
+def crop_faces(img_name="cropped_face.png", img=None, detector=None, cropped_dir='Images/cropped-images',idx0=0,score_threshold=.3,min_dim=16,save_rect=True,
+               save_square=True,return_faces=False,do_filtering=True,imres=(None,None)):
     '''
     INPUTS
     img_name - full path to input image if img is None, or output name if img is input image
@@ -273,6 +274,7 @@ def crop_faces(img_name="cropped_face.png", img=None, detector=None, cropped_dir
         else:
             return detector, idx0
     Nf = 0 # initialize in case the for loop is skipped
+    npop = 0
     if faces[1] is not None:
         # First we need to check for and remove cases of boxes within boxes.
         # Setting a lower nms_threshold would remove the outer box, but if that larger box is around two smaller boxes,
@@ -308,7 +310,6 @@ def crop_faces(img_name="cropped_face.png", img=None, detector=None, cropped_dir
         # There may still be values that are too large, but it's more convenient to sort this out within the loop
         Nf = len(coords)
         # Now loop through the faces that we have determined are indeed faces.
-        npop = 0
         for idx in range(Nf):
             x1, y1, w, h = coords[idx,0:4]
             if min(w,h) < min_dim:
@@ -367,14 +368,16 @@ def crop_faces(img_name="cropped_face.png", img=None, detector=None, cropped_dir
                     x1 = x1 + dw
                     x2 = x1 + ws
                 imgs = img[y1:y1+hs, x1:x1+ws, :]
+                if imres[1] is not None: # need to resize image
+                    imgs = cv2.resize(imgs,imres)
                 names =  os.path.join(cropped_dir,filename+'-square'+str(idx0+idx)+'.png')
                 cv2.imwrite(names,imgs)
                 if return_faces:
                     cropped_imgs.append(imgs)
     if return_faces:
-        return detector,idx0+Nf,img,faces,cropped_imgs
+        return detector,idx0+Nf-npop,img,faces,cropped_imgs
     else:
-        return detector,idx0+idx # so we don't have to re-initialize next time
+        return detector,idx0+Nf-npop # so we don't have to re-initialize next time
 
 def download_models():
     # Download detection model
@@ -739,17 +742,72 @@ def create_unlabeled_set(in_dir='Images/anime-frames-cropped',out_dir="Images/da
     imgs_list = glob.glob(os.path.join(in_dir,"*-square*"))
     os.makedirs(out_dir,exist_ok=True)
     print(f"Resizing square images in {in_dir} to save in {out_dir}")
+    # We want
+    Nimgs = int(np.floor(np.sqrt(len(imgs_list)))**2)
+    imgs_list = imgs_list[0:Nimgs-1]
     imgs = []
     for file in imgs_list:
         img = cv2.resize(cv2.imread(file),imres)
         cv2.imwrite(os.path.join(out_dir,os.path.basename(file)),img)
         imgs.append(img)
-        lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
+        lab = cv2.cvtColor(imgs, cv2.COLOR_BGR2LAB)
+        imgi = cv2.cvtColor(imgs, cv2.COLOR_BGR2LUV)
     nimages = len(imgs)
     channels = [0,1,2]*nimages
     hist_sizes = [16,16,16]*nimages
     ranges = [0,256]*3*nimages
     hist = cv2.calcHist(imgs,channels=channels,mask=None,histSize=hist_sizes,ranges=ranges)
+
+def get_not_this_anime_(anime_file,imres=(96,96)):
+    df = pd.read_csv(anime_file)
+    anime_name = anime_file.split('-')[0]
+    reject_strs = [anime_name]
+    for idx in df.index:
+        reject_strs.append(df.Name[idx])
+        if type(df.Other_Names[idx]) == str:
+            additional_keys = df.Other_Names[idx].split(',')
+            reject_strs.extend(additional_keys)
+    # Get dataset of anime images excluding our anime
+    parallel_worker_threads(search_keys="anime characters",token_names="anime_characters",imgs_path="Images/other_anime-original",num_images=500,
+                            maxmissed=1000,reject_strs=reject_strs,simthresh=.3)
+    imgs_list = files_in_dir("Images/other_anime-original")
+    other_anime_data_dir = os.path.join("Images","dataset-other_anime")
+    os.makedirs(other_anime_data_dir,exist_ok=True)
+    for file in imgs_list:
+        detector, idx0, img, faces, cropped_faces  = crop_faces(img_name=file,cropped_dir="Images/other_anime-cropped",score_threshold=.9,save_rect=False,imres=imres)
+        if idx0:
+            fullfile,ext = os.path.splitext(file)
+            Nimg = len(cropped_faces)
+            num_digits = int(np.ceil(np.log10(Nimg)))
+            for idx in range(Nimg):
+                idxstr = str(idx)
+                idxstr = '0'*(num_digits-len(idxstr)) + idxstr
+                out_name = os.path.basename(fullfile)+'_'+idxstr+ext
+                img = cv2.resize(cropped_faces[idx],imres) # resize square image
+                cv2.imwrite(os.path.join(other_anime_data_dir,out_name),img)
+    # Delete unneded directories, and in doing so remove any potentially problematic images.
+    shutil.rmtree("Images/other_anime-original")
+    shutil.rmtree("Images/other_anime-cropped")
+    # Get dataset of irl faces that definitely won't be our anime
+    parallel_worker_threads(search_keys="people's faces",token_names="people_faces",imgs_path="Images/not_anime-original",num_images=500,simthresh=.2)
+    imgs_list = files_in_dir("Images/not_anime-original")
+    not_anime_data_dir = os.path.join("Images","dataset-not_anime")
+    os.makedirs(not_anime_data_dir,exist_ok=True)
+    for file in imgs_list:
+        detector, idx0, img, faces, cropped_faces  = crop_faces(img_name=file,cropped_dir="Images/not_anime-cropped",score_threshold=.9,save_rect=False,return_faces=True)
+        if idx0:
+            fullfile,ext = os.path.splitext(file)
+            Nimg = len(cropped_faces)
+            num_digits = int(np.ceil(np.log10(Nimg)))
+            for idx in range(Nimg):
+                idxstr = str(idx)
+                idxstr = '0'*(num_digits-len(idxstr)) + idxstr
+                out_name = os.path.basename(fullfile)+'_'+idxstr+ext
+                img = cv2.resize(cropped_faces[idx],imres) # resize square image
+                cv2.imwrite(os.path.join(not_anime_data_dir,out_name),img)
+    # Delete unneded directories, and in doing so remove any potentially problematic images.
+    shutil.rmtree("Images/not_anime-original")
+    shutil.rmtree("Images/not_anime-cropped")
 
 
 
@@ -772,5 +830,6 @@ if __name__ == '__main__':
     # get_colorspace('Images/vinland-frames-cropped-rect',cfg_name='vinland_colorspace.ini')
     # filter_by_colorspace('Images/google-images-cropped/Adolf_Junkers/',cfg_name='monster_colorspace_rect.cfg',za_thresh=1)
     # filter_google_images()
-    create_unlabeled_set()
+    # create_unlabeled_set()
+    get_not_this_anime_("Monster-Characters.csv")
 

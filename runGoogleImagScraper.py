@@ -13,13 +13,15 @@ import argparse
 
 def worker_thread(search_key,token_name):
     image_scraper = GoogleImageScraper(image_path=images_path, search_key=search_key, number_of_images=number_of_images, token_name=token_name, 
-                                       headless=headless, min_resolution=min_resolution, max_resolution=max_resolution, max_missed=max_missed)
+                                       headless=headless, min_resolution=min_resolution, max_resolution=max_resolution, max_missed=max_missed,
+                                       reject_strings=reject_strings, sim_thresh=sim_thresh)
     image_urls = image_scraper.find_image_urls()
     image_scraper.save_images(image_urls, keep_filenames)
     #Release resources
     del image_scraper
 
-def parallel_worker_threads(search_keys=['cat'],token_names=['image'],imgs_path='google-images',num_images=20,maxmissed=10,keepfilenames=False,min_res=(0,0),max_res=(9999,9999),isheadless=True):
+def parallel_worker_threads(search_keys=['cat'],token_names=['image'],imgs_path='google-images',num_images=20,maxmissed=10,keepfilenames=False,
+                            min_res=(0,0),max_res=(9999,9999),isheadless=True,reject_strs=None,simthresh=.5):
     # First make sure variable types are set correctly
     if type(search_keys) is str:
         search_keys = [search_keys]
@@ -41,6 +43,10 @@ def parallel_worker_threads(search_keys=['cat'],token_names=['image'],imgs_path=
     max_resolution = max_res
     global headless
     headless = isheadless
+    global reject_strings
+    reject_strings = reject_strs
+    global sim_thresh
+    sim_thresh = simthresh
 
     number_of_workers = len(search_keys) # Number of "workers" used
     if len(token_names) != number_of_workers:
