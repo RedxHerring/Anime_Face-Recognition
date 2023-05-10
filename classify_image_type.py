@@ -5,7 +5,8 @@ from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
 # Enable GPU acceleration
 physical_devices = tf.config.list_physical_devices("GPU")
-tf.config.experimental.set_memory_growth(physical_devices[0], True)
+if len(physical_devices) > 0:
+    tf.config.experimental.set_memory_growth(physical_devices[0], True)
 
 # Set up the CNN model
 model = keras.Sequential([
@@ -53,4 +54,4 @@ model.fit(
 )
 
 # Save the trained model
-model.save('anime_classifier_model.h5')
+model.save('models/anime_classifier_model.h5')
