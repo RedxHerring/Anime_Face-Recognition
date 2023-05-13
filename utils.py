@@ -798,7 +798,7 @@ def get_character_images(anime_file,images_path='Images/character_images',imres=
     # Delete unneeded directories, and in doing so remove any potentially problematic images.
     shutil.rmtree(images_path)
 
-def initialize_recursive_dataset(base_dir="Images/myanimelist-images-original",out_dir="datsets_recusive",imres=(96,96)):
+def initialize_recursive_dataset(base_dir="Images/myanimelist-images-original",out_dir="datasets_recursive",imres=(96,96)):
     class_names = glob.glob(os.path.join(base_dir,"*"))
     for class_name in class_names:
         for file in os.listdir(class_name):
