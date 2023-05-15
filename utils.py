@@ -108,7 +108,7 @@ def list_anime_characters(anime_name,images_path='',keep_filenames=False):
             if character_name[0] == " ": # extra space is generated
                 character_name = character_name[1:]
         # Check if character name already present, can happen for small side character names
-        while character_name in character_names: 
+        while character_name in character_names:
             if char_is_num(character_name[-1]):
                 character_name = character_name[0:-1] + str(int(character_name[-1])+1)
             else:
@@ -430,7 +430,7 @@ def crop_video_frames(videos_dir,out_dir='Images/anime-frames-cropped',skip_fram
 
 
 def identical_images(img1,img2,L1_thresh=.05):
-    # For this function we consider a lighter version of an image to be the same image, 
+    # For this function we consider a lighter version of an image to be the same image,
     # as we want to know how many truly unique iamges we have.
     # Therefore, we start by normalizing.
     img1 = img1/np.max(img1)
@@ -503,7 +503,7 @@ def is_in_colorpsace(img,cfg_name='anime_colorspace.cfg',config=None,za_thresh=1
     This function looks at an image, and determines whether it is within the distribution of the colorspace determined by the config file.
     INPUTS
     img - cv2 image (BGR), or path to image
-    cfg_name - config file created with get_colorspace(). 
+    cfg_name - config file created with get_colorspace().
     The file name will also have a special significance in determining what images it should be used to filter.
     If 'rect' is in the file name, then the cfg file describes the colorspace of rectangular crops only.
     Likewise, 'square' describes the distribution for square crops only. rectangular crops usually have a lower std.
@@ -560,11 +560,11 @@ def is_in_colorpsace(img,cfg_name='anime_colorspace.cfg',config=None,za_thresh=1
 
 def filter_by_colorspace(images_dir, cfg_name='anime_colorspace.ini', accepted_dir='Images/accepted-images', rejected_dir='Images/recjcted-images',za_thresh=1.5,zr_thresh=2.5):
     '''
-    This function reads through all images in a directory, 
+    This function reads through all images in a directory,
     and saves the ones with a colorspace that falls within the one defined by the config file.
     INPUTS
     images_dir - directory to non-recursively search for images within
-    cfg_name - config file created with get_colorspace(). 
+    cfg_name - config file created with get_colorspace().
     The file name will also have a special significance in determining what images it should be used to filter.
     If 'rect' is in the file name, then the cfg file describes the colorspace of rectangular crops only.
     Likewise, 'square' describes the distribution for square crops only. rectangular crops usually have a lower std.
@@ -608,8 +608,8 @@ def filter_by_colorspace(images_dir, cfg_name='anime_colorspace.ini', accepted_d
 def get_face_similarity(img1,img2,detector=None):
     '''
     This function uses cv2 face recognition to get a feature vector of two faces,
-    after which cosine similarity can be used. 
-    The detection algorithm must first be used to locate features, 
+    after which cosine similarity can be used.
+    The detection algorithm must first be used to locate features,
     so it's best if the input image is a crop slightly larger than the one made by the detector,
     i.e. the square crop
     INPUTS
@@ -624,7 +624,7 @@ def get_face_similarity(img1,img2,detector=None):
     detector, img2, faces2 = crop_faces(img_name=img2,detector=detector,save_rect=False,save_square=False)
     recognizer = cv2.FaceRecognizerSF.create(
             "models/fr_sface.onnx","")
-            
+
     face1_align = recognizer.alignCrop(img1, faces1[1][0])
     face2_align = recognizer.alignCrop(img2, faces2[1][0])
     # Extract features
@@ -718,7 +718,7 @@ def filter_google_images():
 
 def create_unlabeled_set(in_dir='Images/anime-frames-cropped',out_dir="Images/dataset-unlabeled",imres=(96,96)):
     '''
-    This function loops through square iamges found by cropping faces out of the anime, 
+    This function loops through square iamges found by cropping faces out of the anime,
     and resizes them so that they can be fed into a CNN.
     It also creates a histogram of the color pallette used.
     INPUTS
@@ -802,8 +802,8 @@ def initialize_recursive_dataset(base_dir="Images/myanimelist-images-original",o
     class_names = glob.glob(os.path.join(base_dir,"*"))
     for class_name in class_names:
         for file in os.listdir(class_name):
-            crop_faces(os.path.join(class_name,file),cropped_dir=os.path.join(out_dir,os.path.basename(class_name)),score_threshold=.5,save_rect=False,imres=imres)
-        
+            crop_faces(os.path.join(class_name,file),cropped_dir=os.path.join(out_dir,os.path.basename(class_name)),score_threshold=.3,save_rect=False,imres=imres)
+
 if __name__ == '__main__':
     # list_anime_characters('Monster','Images/myanimelist-images-original')
     get_character_images("Monster-Characters.csv")

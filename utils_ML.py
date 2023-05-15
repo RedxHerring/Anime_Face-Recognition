@@ -1,4 +1,6 @@
 import tensorflow as tf
+import tensorflow_hub as hub
+import numpy as np
 import glob
 import os
 import random
@@ -140,5 +142,131 @@ def get_image_type(image_path,model=None):
 
     return predicted_class_label, model
 
+def build_dataset_recursive(base_dir, imres, subset):
+    return tf.keras.preprocessing.image_dataset_from_directory(
+        base_dir,
+        validation_split=0,
+        label_mode="categorical",
+        seed=321,
+        image_size=imres,
+        batch_size=1)
+
+class_names = None
+
+def train_face_recognition(base_dir='datasets_recursive',imres=(96,96)):
+    batch_size = 16
+    checkpoint_path = "checkpt"
+    training_set = build_dataset_recursive(base_dir, imres, "training")
+    class_names = tuple(training_set.class_names)
+    training_size = training_set.cardinality().numpy()
+    training_set = training_set.unbatch().batch(batch_size)
+    training_set = training_set.repeat()
+    normalization_layer = tf.keras.layers.Rescaling(1. / 255)
+    preprocessing_model = tf.keras.Sequential([normalization_layer])
+    do_data_augmentation = True
+    if do_data_augmentation:
+        preprocessing_model.add(
+            tf.keras.layers.RandomRotation(40))
+        preprocessing_model.add(
+            tf.keras.layers.RandomRotation(0.4))
+        preprocessing_model.add(
+            tf.keras.layers.RandomTranslation(0, 0.2))
+        preprocessing_model.add(
+            tf.keras.layers.RandomTranslation(0.2, 0))
+        preprocessing_model.add(
+            tf.keras.layers.RandomZoom(0.2, 0.2))
+        preprocessing_model.add(
+            tf.keras.layers.RandomFlip(mode="horizontal_and_vertical"))
+        preprocessing_model.add(
+            tf.keras.layers.RandomContrast(0.2))
+    training_set = training_set.map(lambda images, labels:
+                            (preprocessing_model(images), labels))
+    # validation_set = build_dataset_recursive(base_dir, imres, "validation")
+    # validation_set_all = validation_set
+    # validation_size = validation_set.cardinality().numpy()
+    # validation_set = validation_set.unbatch().batch(batch_size)
+    # validation_set = validation_set.map(lambda images, labels:
+    #                     (normalization_layer(images), labels))
+    do_fine_tuning = True
+    model = tf.keras.Sequential([
+        tf.keras.layers.InputLayer(input_shape=imres + (3,)),
+        hub.KerasLayer('https://tfhub.dev/tensorflow/efficientnet/b7/feature-vector/1', trainable=do_fine_tuning),
+        tf.keras.layers.Dropout(rate=0.7),
+        tf.keras.layers.Dense(len(class_names),
+                            kernel_regularizer=tf.keras.regularizers.l2(0.0003))
+    ])
+    model.build((None,)+imres+(3,))
+    model.summary()
+    epoch = 100
+    lr = 0.001
+    decay_rate = lr / epoch
+    model.compile(
+        optimizer=tf.keras.optimizers.legacy.SGD(learning_rate=lr, momentum=0.9, nesterov=False, decay=decay_rate),
+        loss=tf.keras.losses.CategoricalCrossentropy(from_logits=True, label_smoothing=0.1),
+        metrics=['accuracy',tf.keras.metrics.TopKCategoricalAccuracy(name='top-5-accuracy')],)
+    callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=6)
+    reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.2,
+                            patience=3, min_lr=0.00001)
+    checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
+        checkpoint_path,
+        monitor="val_accuracy",
+        save_best_only=True,
+        save_weights_only=True,
+    )
+    steps_per_epoch = training_size // batch_size
+    # validation_steps = validation_size // batch_size
+    hist = model.fit(
+        training_set,
+        epochs=epoch, steps_per_epoch=steps_per_epoch,
+        # validation_data=validation_set,
+        # validation_steps=validation_steps,
+        callbacks=[reduce_lr, checkpoint_callback, callback]).history
+    return model, hist
+
+def test_model(model, base_dir='datasets_anime', imres=(96,96)):
+    test_set = tf.keras.utils.image_dataset_from_directory(
+        base_dir,
+        image_size=imres,
+        label_mode="categorical",
+        batch_size=1)
+    normalization_layer = tf.keras.layers.Rescaling(1. / 255)
+    test_set = test_set.map(lambda images, labels:
+                        (normalization_layer(images), labels))
+    _, accuracy, top_5_accuracy = model.evaluate(test_set)
+    print(f"Test accuracy: {round(accuracy * 100, 2)}%")
+    print(f"Test top 5 accuracy: {round(top_5_accuracy * 100, 2)}%")
+    characters = os.listdir(base_dir)
+    for character in characters:
+        files = os.listdir(base_dir + '/' + character)
+        for image_file in files:
+            img_f = base_dir + '/' + character + '/' + image_file
+            img = tf.keras.utils.load_img(
+                img_f , target_size=imres
+            )
+            img_array = tf.keras.utils.img_to_array(img)
+            img_array = tf.expand_dims(img_array, 0) # Create a batch
+
+            img_array = normalization_layer(img_array)
+
+            image = img_array[0,:,:,:]
+
+            print(f"True Label: {character}")
+
+            print("This image is likely belongs to:")
+            predictions = model.predict(img_array)
+
+            score = tf.nn.softmax(predictions[0])
+
+            predicted_index = np.argsort(score)[-5:][::-1]
+
+            for idx in predicted_index:
+                prediction_score = (100 * score[idx])
+
+                print(
+                    f"> {class_names[idx]} : {prediction_score:.2f} % confidence."
+                )
+
 if __name__ == "__main__":
-    classify_image_type()
+    # classify_image_type()
+    model, hist = train_face_recognition()
+    test_model(model)
