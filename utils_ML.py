@@ -5,7 +5,11 @@ import glob
 import os
 import random
 import shutil
+import matplotlib.pyplot as plt
+from scipy.signal import find_peaks
+import shutil
 from tensorflow import keras
+import keras_tuner as kt
 from tensorflow.keras import layers
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.preprocessing.image import load_img, img_to_array
@@ -142,7 +146,7 @@ def get_image_type(image_path,model=None):
 
     return predicted_class_label, model
 
-def build_dataset_recursive(base_dir, imres, subset):
+def build_dataset(base_dir='datasets_recursive', imres=(96, 96), subset='training'):
     return tf.keras.preprocessing.image_dataset_from_directory(
         base_dir,
         validation_split=0,
@@ -151,42 +155,40 @@ def build_dataset_recursive(base_dir, imres, subset):
         image_size=imres,
         batch_size=1)
 
-class_names = None
-
 def train_face_recognition(base_dir='datasets_recursive',imres=(96,96)):
     batch_size = 16
     checkpoint_path = "checkpt"
-    training_set = build_dataset_recursive(base_dir, imres, "training")
+
+    # prepare training and validation datasets
+    training_set = build_dataset(base_dir, imres, "training")
     class_names = tuple(training_set.class_names)
     training_size = training_set.cardinality().numpy()
-    training_set = training_set.unbatch().batch(batch_size)
-    training_set = training_set.repeat()
+    training_set = training_set.unbatch().repeat().batch(batch_size)
     normalization_layer = tf.keras.layers.Rescaling(1. / 255)
+    validation_set = build_dataset('datasets_anime', subset='validation')
+    validation_size = validation_set.cardinality().numpy()
+    validation_set = validation_set.unbatch().batch(batch_size)
+    validation_set = validation_set.map(lambda images, labels:
+                    (normalization_layer(images), labels))
+
+    # data augmentation
     preprocessing_model = tf.keras.Sequential([normalization_layer])
-    do_data_augmentation = True
-    if do_data_augmentation:
-        preprocessing_model.add(
-            tf.keras.layers.RandomRotation(40))
-        preprocessing_model.add(
-            tf.keras.layers.RandomRotation(0.4))
-        preprocessing_model.add(
-            tf.keras.layers.RandomTranslation(0, 0.2))
-        preprocessing_model.add(
-            tf.keras.layers.RandomTranslation(0.2, 0))
-        preprocessing_model.add(
-            tf.keras.layers.RandomZoom(0.2, 0.2))
-        preprocessing_model.add(
-            tf.keras.layers.RandomFlip(mode="horizontal_and_vertical"))
-        preprocessing_model.add(
-            tf.keras.layers.RandomContrast(0.2))
+    preprocessing_model.add(
+        tf.keras.layers.RandomRotation(40))
+    # preprocessing_model.add(
+    #     tf.keras.layers.RandomRotation(0.4))
+    preprocessing_model.add(
+        tf.keras.layers.RandomTranslation(0, 0.2))
+    preprocessing_model.add(
+        tf.keras.layers.RandomTranslation(0.2, 0))
+    preprocessing_model.add(
+        tf.keras.layers.RandomZoom(0.2, 0.2))
+    # preprocessing_model.add(
+    #     tf.keras.layers.RandomFlip(mode="horizontal_and_vertical"))
+    preprocessing_model.add(
+        tf.keras.layers.RandomContrast(0.2))
     training_set = training_set.map(lambda images, labels:
                             (preprocessing_model(images), labels))
-    # validation_set = build_dataset_recursive(base_dir, imres, "validation")
-    # validation_set_all = validation_set
-    # validation_size = validation_set.cardinality().numpy()
-    # validation_set = validation_set.unbatch().batch(batch_size)
-    # validation_set = validation_set.map(lambda images, labels:
-    #                     (normalization_layer(images), labels))
     do_fine_tuning = True
     model = tf.keras.Sequential([
         tf.keras.layers.InputLayer(input_shape=imres + (3,)),
@@ -214,59 +216,86 @@ def train_face_recognition(base_dir='datasets_recursive',imres=(96,96)):
         save_weights_only=True,
     )
     steps_per_epoch = training_size // batch_size
-    # validation_steps = validation_size // batch_size
+    validation_steps = validation_size // batch_size
     hist = model.fit(
         training_set,
         epochs=epoch, steps_per_epoch=steps_per_epoch,
-        # validation_data=validation_set,
-        # validation_steps=validation_steps,
+        validation_data=validation_set,
+        validation_steps=validation_steps,
         callbacks=[reduce_lr, checkpoint_callback, callback]).history
+    model.save('saved_model.h5')
     return model, hist
 
-def test_model(model, base_dir='datasets_anime', imres=(96,96)):
-    test_set = tf.keras.utils.image_dataset_from_directory(
-        base_dir,
-        image_size=imres,
-        label_mode="categorical",
-        batch_size=1)
+def load_existing_model():
+    model = tf.keras.models.load_model('saved_model.h5',
+       custom_objects={'KerasLayer':hub.KerasLayer})
+    return model
+
+def classify_character(character, class_names, imres=(96, 96)):
+    files = os.listdir('datasets_anime' + '/' + character)
+    accuracy = np.array([], dtype=float)
     normalization_layer = tf.keras.layers.Rescaling(1. / 255)
-    test_set = test_set.map(lambda images, labels:
-                        (normalization_layer(images), labels))
-    _, accuracy, top_5_accuracy = model.evaluate(test_set)
-    print(f"Test accuracy: {round(accuracy * 100, 2)}%")
-    print(f"Test top 5 accuracy: {round(top_5_accuracy * 100, 2)}%")
-    characters = os.listdir(base_dir)
-    for character in characters:
-        files = os.listdir(base_dir + '/' + character)
-        for image_file in files:
-            img_f = base_dir + '/' + character + '/' + image_file
-            img = tf.keras.utils.load_img(
-                img_f , target_size=imres
-            )
-            img_array = tf.keras.utils.img_to_array(img)
-            img_array = tf.expand_dims(img_array, 0) # Create a batch
+    print(f"Character: {character}")
+    for img_file in files:
+        img_f = 'datasets_anime/' + character + '/' + img_file
+        img = tf.keras.utils.load_img(
+            img_f , target_size=imres
+        )
+        img_array = tf.keras.utils.img_to_array(img)
+        img_array = tf.expand_dims(img_array, 0) # Create a batch
 
-            img_array = normalization_layer(img_array)
+        img_array = normalization_layer(img_array)
+        image = img_array[0,:,:,:]
+        predictions = model.predict(img_array)
 
-            image = img_array[0,:,:,:]
+        score = tf.nn.softmax(predictions[0])
 
-            print(f"True Label: {character}")
-
-            print("This image is likely belongs to:")
-            predictions = model.predict(img_array)
-
-            score = tf.nn.softmax(predictions[0])
-
+        found = False
+        if score != None:
             predicted_index = np.argsort(score)[-5:][::-1]
-
             for idx in predicted_index:
                 prediction_score = (100 * score[idx])
 
-                print(
-                    f"> {class_names[idx]} : {prediction_score:.2f} % confidence."
-                )
+                if class_names[idx] == character:
+                    found = True
+                    accuracy = np.append(accuracy, prediction_score)
+        if found == False:
+             accuracy = np.append(accuracy, 0)
+    print(accuracy)
+    histogram, edges = np.histogram(accuracy)
+
+    # finding a decent threshold by looking for local minima and choosing the rightmost one
+    local_minima = find_peaks(np.negative(histogram))
+    if local_minima[0].size != 0:
+        cutoff = edges[local_minima[0][-1]]
+        matches = np.flatnonzero(accuracy >= cutoff)
+        # plt.stairs(histogram, edges, fill=True)
+        # plt.show()
+        for match in matches:
+            print('dataset_anime/' + character + '/' + files[match])
+            # print('dataset_recursive/' + character + '/' + files[c])
+            # shutil.copy('datasets_anime/' + character + '/' + files[c], 'datasets_recursive/' + character + '/' + files[c])
+        return (len(matches)/len(files))
+    return 0
+
+def classify_all_characters():
+    training_set = build_dataset()
+    class_names = tuple(training_set.class_names)
+    characters = os.listdir('datasets_anime')
+    overall_matches = np.array([])
+    i = 1
+    for character in characters:
+        print(f'{i}/{len(characters)}')
+        detection_rate = classify_character(character, class_names)
+        overall_matches = np.append(overall_matches, detection_rate)
+        print(detection_rate)
+        print(overall_matches)
+        print(f'Overall detection rate: {np.mean(overall_matches)}')
+        i += 1
+
 
 if __name__ == "__main__":
     # classify_image_type()
     model, hist = train_face_recognition()
-    test_model(model)
+    # model = load_existing_model()
+    classify_all_characters()
