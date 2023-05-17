@@ -2,7 +2,7 @@ import glob
 import os
 import shutil
 from utils import files_in_dir, initialize_recursive_dataset
-from utils_ML import get_image_type
+from utils_ML import classify_image_type
 
 def filter_dataset_by_imagetype(dataset_dir_in="datasets_base",dataset_dir_out="datasets_anime",rejected_dir_top="Images/rejected_images"):
     '''
@@ -21,7 +21,7 @@ def filter_dataset_by_imagetype(dataset_dir_in="datasets_base",dataset_dir_out="
         rejected_dir = os.path.join(rejected_dir_top,os.path.basename(dir))
         os.makedirs(rejected_dir,exist_ok=True)
         for file in images_list:
-            predicted_class_label, model = get_image_type(file,model=model)
+            predicted_class_label, model = classify_image_type(file,model=model)
             if predicted_class_label == "this_anime":
                 shutil.copy(file,os.path.join(accepted_dir,os.path.basename(file)))
             else:

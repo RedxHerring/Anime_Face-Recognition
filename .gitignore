@@ -23,3 +23,5 @@ photos
 webdriver/chromedriver.exe
 checkpoint*
 checkpt*
+models/*.h5
+!models/anime_classifier_model.h5

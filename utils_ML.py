@@ -9,12 +9,20 @@ import matplotlib.pyplot as plt
 from scipy.signal import find_peaks
 import shutil
 from tensorflow import keras
-import keras_tuner as kt
 from tensorflow.keras import layers
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.preprocessing.image import load_img, img_to_array
 
-def classify_image_type(base_dir='datasetsTON',imres=(96,96)):
+import os
+import random
+import cv2
+import torch
+from torchvision import transforms
+
+from torch.cuda.amp import autocast
+from intel_extension_for_pytorch import nn
+
+def train_image_type(base_dir='datasetsTON',imres=(96,96)):
     # Check if Intel Arc GPU is available
     intel_arc_available = tf.config.list_physical_devices("GPU")
     if intel_arc_available and "ARC" in intel_arc_available[0].name:
@@ -123,12 +131,12 @@ def classify_image_type(base_dir='datasetsTON',imres=(96,96)):
         print(f"Epoch {epoch+1} - Training Accuracy: {training_accuracy[epoch]:.4f} - Validation Accuracy: {validation_accuracy[epoch]:.4f}")
 
     # Save the trained model
-    model.save('models/anime_classifier_model.h5')
+    model.save('models/image_type_classifier_model.h5')
 
-def get_image_type(image_path,model=None):
+def classify_image_type(image_path,model=None):
     # Load the trained model
     if model is None:
-        model = keras.models.load_model('models/anime_classifier_model.h5')
+        model = keras.models.load_model('models/image_type_classifier_model.h5')
 
     # Define the class labels
     class_labels = sorted(['this_anime', 'other_anime', 'not_anime'])
@@ -155,17 +163,22 @@ def build_dataset(base_dir='datasets_recursive', imres=(96, 96), subset='trainin
         image_size=imres,
         batch_size=1)
 
-def train_face_recognition(base_dir='datasets_recursive',imres=(96,96)):
+def train_face_recognition_v0(recursive_dir='datasets_recursive',source_dir='datasets_anime',imres=(96,96)):
     batch_size = 16
     checkpoint_path = "checkpt"
 
+    recursive_classes = set(os.listdir(recursive_dir))
+    source_classes = set(os.listdir(source_dir))
+    missing_classes = recursive_classes - source_classes
+    for missing_class in missing_classes:
+        os.makedirs(os.path.join(source_dir,missing_class)) 
     # prepare training and validation datasets
-    training_set = build_dataset(base_dir, imres, "training")
+    training_set = build_dataset(recursive_dir, imres, "training")
     class_names = tuple(training_set.class_names)
     training_size = training_set.cardinality().numpy()
     training_set = training_set.unbatch().repeat().batch(batch_size)
     normalization_layer = tf.keras.layers.Rescaling(1. / 255)
-    validation_set = build_dataset('datasets_anime', subset='validation')
+    validation_set = build_dataset(source_dir, subset='validation')
     validation_size = validation_set.cardinality().numpy()
     validation_set = validation_set.unbatch().batch(batch_size)
     validation_set = validation_set.map(lambda images, labels:
@@ -223,8 +236,147 @@ def train_face_recognition(base_dir='datasets_recursive',imres=(96,96)):
         validation_data=validation_set,
         validation_steps=validation_steps,
         callbacks=[reduce_lr, checkpoint_callback, callback]).history
-    model.save('saved_model.h5')
+    model.save('models/saved_model.h5')
     return model, hist
+
+
+def train_face_recognition_v1(recursive_dir="datasets_recursive", source_dir="datasets_anime", imres=(96,96)):
+    # Set the image size and other parameters
+    batch_size = 32
+    epochs = 10
+    num_augmented_images = 100  # Number of augmented images to generate per class
+
+    # Create data generators for training and validation
+    train_datagen = ImageDataGenerator(
+        rescale=1.0/255.0,
+        rotation_range=40,
+        width_shift_range=0.2,
+        height_shift_range=0.2,
+        shear_range=0.2,
+        zoom_range=0.2,
+        horizontal_flip=True,
+        brightness_range=(0.8, 1.2),
+        fill_mode='nearest')
+
+    validation_datagen = ImageDataGenerator(rescale=1.0/255.0)
+
+    # Generate additional augmented images for each class
+    for class_dir in os.listdir(recursive_dir):
+        class_path = os.path.join(recursive_dir, class_dir)
+        if os.path.isdir(class_path):
+            images = os.listdir(class_path)
+            class_images = images[:1]  # Take the first image of each class
+            class_generator = train_datagen.flow_from_directory(
+                class_path,
+                target_size=imres,
+                batch_size=1,
+                class_mode='categorical',
+                save_to_dir=class_path,
+                save_prefix='aug_',
+                save_format='png')
+
+            for _ in range(num_augmented_images):
+                class_generator.next()
+
+            class_generator.reset()
+
+    train_generator = train_datagen.flow_from_directory(
+        recursive_dir,
+        target_size=imres,
+        batch_size=batch_size,
+        class_mode='categorical')
+
+    validation_generator = validation_datagen.flow_from_directory(
+        source_dir,
+        target_size=imres,
+        batch_size=batch_size,
+        class_mode='categorical')
+
+    # Define and compile your model
+    model = keras.Sequential()
+    # Add your model layers
+
+    model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+
+    # Train your model
+    model.fit(
+        train_generator,
+        steps_per_epoch=train_generator.samples // batch_size,
+        epochs=epochs,
+        validation_data=validation_generator,
+        validation_steps=validation_generator.samples // batch_size)
+
+
+def train_face_recognition(recursive_dir="datasets_recursive", source_dir="datasets_anime", num_augmentations=100):
+
+  # Get the list of classes in the recursive_dir directory.
+  classes = [
+      os.path.basename(d) for d in os.listdir(recursive_dir) if os.path.isdir(os.path.join(recursive_dir, d))
+  ]
+
+  # Create a training set and a validation set.
+  training_set = []
+  validation_set = []
+  for class_name in classes:
+    images = [
+      cv2.imread(os.path.join(recursive_dir, class_name, image_path))
+      for image_path in os.listdir(os.path.join(recursive_dir, class_name))
+    ]
+    random.shuffle(images)
+    training_set.extend(images[:int(len(images) * 0.8)])
+    validation_set.extend(images[int(len(images) * 0.8):])
+
+  # Create a face recognition model.
+  model = torchvision.models.resnet18(pretrained=True)
+  model.fc = nn.IPEXLinear(512, len(classes))
+
+  # Train the model on the training set.
+  criterion = torch.nn.CrossEntropyLoss()
+  optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+  for epoch in range(10):
+    with autocast():
+      for image in training_set:
+        # Apply image augmentations to the image.
+        for i in range(num_augmentations):
+          image = transforms.RandomHorizontalFlip()(image)
+          # Remove vertical flip
+          image = transforms.RandomRotation(degrees=10)(image)
+          image = transforms.RandomResizedCrop(size=(96, 96))(image)
+          image = transforms.RandomTranslation(0.1, 0.1)(image)
+
+        # Convert the image to a tensor and normalize it.
+        image = transforms.ToTensor()(image)
+        image = transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))(image)
+
+        # Feed the image to the model and calculate the loss.
+        output = model(image)
+        loss = criterion(output, class_name)
+
+        # Backpropagate the loss and update the model parameters.
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+  # Evaluate the model on the validation set.
+  correct = 0
+  total = 0
+  for image, label in validation_set:
+    image = transforms.ToTensor()(image)
+    image = transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))(image)
+    output = model(image)
+    _, predicted = output.max(1)
+    total += 1
+    correct += predicted == label
+  accuracy = 100 * correct / total
+
+  # Print the accuracy.
+  print("Accuracy:", accuracy)
+
+  # Save the model.
+  torch.save(model, "face_recognition_model.pth")
+
+
+
 
 def load_existing_model():
     model = tf.keras.models.load_model('saved_model.h5',
