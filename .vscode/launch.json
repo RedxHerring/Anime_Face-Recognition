@@ -15,8 +15,14 @@
         {
             "name": "Debug Unit Test",
             "type": "python",
-            "request": "test",
-            "justMyCode": false,
+            "request": "launch",
+            "justMyCode": false
+        },
+        {
+            "name": "intel_init",
+            "type": "node-terminal",
+            "request": "launch",
+            "command": "source /opt/intel/oneapi/setvars.sh"
         }
     ]
 }

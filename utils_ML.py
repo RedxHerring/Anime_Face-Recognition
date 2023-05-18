@@ -13,14 +13,12 @@ from tensorflow.keras import layers
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.preprocessing.image import load_img, img_to_array
 
-import os
-import random
 import cv2
 import torch
+import torchvision
 from torchvision import transforms
-
 from torch.cuda.amp import autocast
-from intel_extension_for_pytorch import nn
+# from intel_extension_for_pytorch import nn
 
 def train_image_type(base_dir='datasetsTON',imres=(96,96)):
     # Check if Intel Arc GPU is available
@@ -239,6 +237,83 @@ def train_face_recognition_v0(recursive_dir='datasets_recursive',source_dir='dat
     model.save('models/saved_model.h5')
     return model, hist
 
+def train_face_recognition_v0ii(recursive_dir='datasets_recursive', source_dir='datasets_anime', imres=(96, 96)):
+    batch_size = 16
+    checkpoint_path = "checkpt"
+
+    recursive_classes = set(os.listdir(recursive_dir))
+    source_classes = set(os.listdir(source_dir))
+    missing_classes = recursive_classes - source_classes
+    for missing_class in missing_classes:
+        os.makedirs(os.path.join(source_dir, missing_class))
+
+    # Prepare training and validation datasets
+    training_set = build_dataset(recursive_dir, imres, "training")
+    class_names = tuple(training_set.class_names)
+    training_size = training_set.cardinality().numpy()
+    training_set = training_set.unbatch().repeat().batch(batch_size)
+
+    normalization_layer = tf.keras.layers.Rescaling(1. / 255)
+    validation_set = build_dataset(source_dir, subset='validation')
+    validation_size = validation_set.cardinality().numpy()
+    validation_set = validation_set.unbatch().batch(batch_size)
+    validation_set = validation_set.map(lambda images, labels: (normalization_layer(images), labels))
+
+    # Data augmentation
+    num_augmented_images = 100
+    preprocessing_model = tf.keras.Sequential([normalization_layer])
+    preprocessing_model.add(tf.keras.layers.RandomRotation(40))
+    preprocessing_model.add(tf.keras.layers.RandomTranslation(0, 0.2))
+    preprocessing_model.add(tf.keras.layers.RandomTranslation(0.2, 0))
+    preprocessing_model.add(tf.keras.layers.RandomZoom(0.2, 0.2))
+    preprocessing_model.add(tf.keras.layers.RandomContrast(0.2))
+    training_set = training_set.map(lambda images, labels: (
+        preprocessing_model(images), labels)).repeat(num_augmented_images)
+
+    do_fine_tuning = True
+    model = tf.keras.Sequential([
+        tf.keras.layers.InputLayer(input_shape=imres + (3,)),
+        hub.KerasLayer('https://tfhub.dev/tensorflow/efficientnet/b7/feature-vector/1', trainable=do_fine_tuning),
+        tf.keras.layers.Dropout(rate=0.7),
+        tf.keras.layers.Dense(len(class_names),
+                              kernel_regularizer=tf.keras.regularizers.l2(0.0003))
+    ])
+    model.build((None,) + imres + (3,))
+    model.summary()
+
+    epoch = 100
+    lr = 0.001
+    decay_rate = lr / epoch
+    model.compile(
+        optimizer=tf.keras.optimizers.legacy.SGD(
+            learning_rate=lr, momentum=0.9, nesterov=False, decay=decay_rate),
+        loss=tf.keras.losses.CategoricalCrossentropy(from_logits=True, label_smoothing=0.1),
+        metrics=['accuracy', tf.keras.metrics.TopKCategoricalAccuracy(name='top-5-accuracy')],
+    )
+
+    callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=6)
+    reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.2, patience=3, min_lr=0.00001)
+    checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
+        checkpoint_path,
+        monitor="val_accuracy",
+        save_best_only=True,
+        save_weights_only=True,
+    )
+
+    steps_per_epoch = (training_size * num_augmented_images) // batch_size
+    validation_steps = validation_size // batch_size
+
+    hist = model.fit(
+        training_set,
+        epochs=epoch,
+        steps_per_epoch=steps_per_epoch,
+        validation_data=validation_set,
+        validation_steps=validation_steps,
+        callbacks=[reduce_lr, checkpoint_callback, callback]
+    ).history
+    model.save('models/saved_modelii.h5')
+    return model, hist
+
 
 def train_face_recognition_v1(recursive_dir="datasets_recursive", source_dir="datasets_anime", imres=(96,96)):
     # Set the image size and other parameters
@@ -328,7 +403,7 @@ def train_face_recognition(recursive_dir="datasets_recursive", source_dir="datas
 
   # Create a face recognition model.
   model = torchvision.models.resnet18(pretrained=True)
-  model.fc = nn.IPEXLinear(512, len(classes))
+#   model.fc = nn.IPEXLinear(512, len(classes))
 
   # Train the model on the training set.
   criterion = torch.nn.CrossEntropyLoss()
@@ -448,6 +523,6 @@ def classify_all_characters():
 
 if __name__ == "__main__":
     # classify_image_type()
-    model, hist = train_face_recognition()
+    model, hist = train_face_recognition_v0ii()
     # model = load_existing_model()
     classify_all_characters()
