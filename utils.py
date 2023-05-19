@@ -718,7 +718,7 @@ def filter_google_images():
 
 def create_unlabeled_set(in_dir='Images/anime-frames-cropped',out_dir="Images/dataset-unlabeled",imres=(96,96)):
     '''
-    This function loops through square iamges found by cropping faces out of the anime,
+    This function loops through square images found by cropping faces out of the anime,
     and resizes them so that they can be fed into a CNN.
     It also creates a histogram of the color pallette used.
     INPUTS
@@ -755,7 +755,7 @@ def get_not_this_anime_(anime_file,imres=(96,96)):
             additional_keys = df.Other_Names[idx].split(',')
             reject_strs.extend(additional_keys)
     # Get dataset of anime images excluding our anime
-    parallel_worker_threads(search_keys="anime characters",token_names="anime_characters",imgs_path="Images/other_anime-original",num_images=500,
+    parallel_worker_threads(search_keys="anime characters",token_names="anime_characters",imgs_path="Images/other_anime-original",num_images=1000,
                             maxmissed=1000,reject_strs=reject_strs,simthresh=.3)
     imgs_list = files_in_dir("Images/other_anime-original")
     # This anime, Other anime, Not anime
@@ -766,7 +766,7 @@ def get_not_this_anime_(anime_file,imres=(96,96)):
     # Delete unneeded directories, and in doing so remove any potentially problematic images.
     shutil.rmtree("Images/other_anime-original")
     # Get dataset of irl faces that definitely won't be our anime
-    parallel_worker_threads(search_keys="people's faces",token_names="people_faces",imgs_path="Images/not_anime-original",num_images=500,simthresh=.2)
+    parallel_worker_threads(search_keys="people's faces",token_names="people_faces",imgs_path="Images/not_anime-original",num_images=1000,simthresh=.2)
     imgs_list = files_in_dir("Images/not_anime-original")
     not_anime_data_dir = os.path.join("datasetsTON","not_anime")
     print(f"Generating dataset of non-anime faces in {not_anime_data_dir}.")
@@ -806,7 +806,7 @@ def initialize_recursive_dataset(base_dir="Images/myanimelist-images-original",o
 
 if __name__ == '__main__':
     # list_anime_characters('Monster','Images/myanimelist-images-original')
-    get_character_images("Monster-Characters.csv")
+    # get_character_images("Monster-Characters.csv")
     # load_image('Images/google-images/Adolf_Junkers/Adolf_Junkers_0.webp')
     # remove_grayscale_images("Monster-Characters.csv",'Images/google-images')
     # check_gray('Images/google-images/Anna_Liebert/')
@@ -814,7 +814,7 @@ if __name__ == '__main__':
     # image_name = 'Images/google-images-original/Robbie/Robbie_25.jpeg'
     # detector = crop_faces(image_name,cropped_dir='Images/google-images-cropped/Robbie')
     # crop_orig_imgs(a_thresh=.01)
-    # crop_video_frames('Monster.S01.480p.NF.WEB-DL.DDP2.0.x264-Emmid',out_dir='datasets/this_anime',skip_frames=1000,save_rect=False,save_square=True)
+    # crop_video_frames('Monster.S01.480p.NF.WEB-DL.DDP2.0.x264-Emmid',out_dir='datasetsTON/this_anime',skip_frames=400,save_rect=False,save_square=True)
     # crop_video_frames('/home/redxhat/Videos/Vinland_Saga',out_dir='Images/vinland-frames-cropped-rect',skip_frames=100,save_rect=True,save_square=False)
 
     # crop_video_frames('/home/redxhat/Videos/Vinland_Saga','Vinland-cropped')
@@ -824,5 +824,5 @@ if __name__ == '__main__':
     # filter_by_colorspace('Images/google-images-cropped/Adolf_Junkers/',cfg_name='monster_colorspace_rect.cfg',za_thresh=1)
     # filter_google_images()
     # create_unlabeled_set()
-    # get_not_this_anime_("Monster-Characters.csv")
+    get_not_this_anime_("Monster-Characters.csv")
 
