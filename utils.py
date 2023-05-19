@@ -198,7 +198,7 @@ def is_single_color(img):
     return False
 
 def crop_faces(img_name="cropped_face.png", img=None, detector=None, cropped_dir='Images/cropped-images',idx0=0,score_threshold=.3,min_dim=16,save_rect=True,
-               save_square=True,return_faces=False,do_filtering=True,imres=(None,None)):
+               save_square=True,return_faces=False,do_filtering=True,imres=(None,None),best_only=False):
     '''
     INPUTS
     img_name - full path to input image if img is None, or output name if img is input image
@@ -210,6 +210,10 @@ def crop_faces(img_name="cropped_face.png", img=None, detector=None, cropped_dir
     min_dim - minimum dimension of a detected face, for it to be considered valid
     save_rect - boolean to determine whether or not to save the crop from cv2
     save_square - boolean to determine whether to save larger modified square crop
+    return_faces - return extra variables to use, including faces tuple and list of cropped images
+    do_filtering - check if face image is effectively single-color, and if so exclude it
+    imres - tuple for image resolution
+    best_only - boolean to decidce wheter to return only the best image
     '''
     if detector is None:
         detector = cv2.FaceDetectorYN.create(
@@ -297,6 +301,8 @@ def crop_faces(img_name="cropped_face.png", img=None, detector=None, cropped_dir
         # There may still be values that are too large, but it's more convenient to sort this out within the loop
         Nf = len(coords)
         # Now loop through the faces that we have determined are indeed faces.
+        if best_only:
+            Nf = 1
         for idx in range(Nf):
             x1, y1, w, h = coords[idx,0:4]
             if min(w,h) < min_dim:
@@ -798,11 +804,11 @@ def get_character_images(anime_file,images_path='Images/character_images',imres=
     # Delete unneeded directories, and in doing so remove any potentially problematic images.
     shutil.rmtree(images_path)
 
-def initialize_recursive_dataset(base_dir="Images/myanimelist-images-original",out_dir="datasets_recursive",imres=(96,96)):
-    class_names = glob.glob(os.path.join(base_dir,"*"))
+def initialize_training_set(base_dir="Images/myanimelist-images-original",out_dir="datasets_training",imres=(96,96)):
+    class_names = sorted(glob.glob(os.path.join(base_dir,"*")))
     for class_name in class_names:
         for file in os.listdir(class_name):
-            crop_faces(os.path.join(class_name,file),cropped_dir=os.path.join(out_dir,os.path.basename(class_name)),score_threshold=.3,save_rect=False,imres=imres)
+            crop_faces(os.path.join(class_name,file),cropped_dir=os.path.join(out_dir,os.path.basename(class_name)),score_threshold=.3,save_rect=False,imres=imres,best_only=True)
 
 if __name__ == '__main__':
     # list_anime_characters('Monster','Images/myanimelist-images-original')

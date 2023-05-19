@@ -24,7 +24,8 @@ from torchvision import transforms
 from torchvision import datasets
 from torchvision.models import efficientnet_v2_l
 
-def train_image_type(base_dir='datasetsTON',imres=(96,96)):
+
+def train_image_type(base_dir='datasetsTON',imres=(96,96),out_name='models/image_type_classifier_model.h5'):
     # Check if Intel Arc GPU is available
     intel_arc_available = tf.config.list_physical_devices("GPU")
     if intel_arc_available and "ARC" in intel_arc_available[0].name:
@@ -52,7 +53,6 @@ def train_image_type(base_dir='datasetsTON',imres=(96,96)):
         layers.Dropout(0.5),
         layers.Dense(3, activation='softmax')
     ])
-
     # Compile the model
     model.compile(optimizer='adam',
                 loss='categorical_crossentropy',
@@ -127,12 +127,14 @@ def train_image_type(base_dir='datasetsTON',imres=(96,96)):
         print(f"Epoch {epoch+1} - Training Accuracy: {training_accuracy[epoch]:.4f} - Validation Accuracy: {validation_accuracy[epoch]:.4f}")
 
     # Save the trained model
-    model.save('models/image_type_classifier_model.h5')
+    model.save(out_name)
+    return model
 
-def classify_image_type(image_path,model=None):
+
+def classify_image_type(image_path,model=None,model_name='models/image_type_classifier_model.h5'):
     # Load the trained model
     if model is None:
-        model = keras.models.load_model('models/image_type_classifier_model.h5')
+        model = keras.models.load_model(model_name)
 
     # Define the class labels
     class_labels = sorted(['this_anime', 'other_anime', 'not_anime'])
@@ -150,6 +152,7 @@ def classify_image_type(image_path,model=None):
 
     return predicted_class_label, model
 
+
 def create_missing_classes(training_dir,validation_dir):
     training_classes = set(os.listdir(training_dir))
     validation_classes = set(os.listdir(validation_dir))
@@ -164,6 +167,7 @@ def create_missing_classes(training_dir,validation_dir):
         out_name = os.path.join(out_dir,base_name+'_hflip'+ext)
         cv2.imwrite(out_name,img)
 
+
 def build_dataset(base_dir='datasets_recursive', imres=(96, 96), subset='training'):
     return tf.keras.preprocessing.image_dataset_from_directory(
         base_dir,
@@ -173,26 +177,26 @@ def build_dataset(base_dir='datasets_recursive', imres=(96, 96), subset='trainin
         image_size=imres,
         batch_size=1)
 
-def train_face_recognition_tf(recursive_dir='datasets_recursive', source_dir='datasets_anime', imres=(96, 96),out_name='models/saved_model.h5'):
+
+def train_face_recognition_tf(training_dir='datasets_training', validation_dir='datasets_anime', imres=(96, 96), num_augmented_images=100, out_name='models/saved_model.h5'):
     batch_size = 16
     checkpoint_path = "checkpt"
 
-    create_missing_classes(training_dir=recursive_dir, validation_dir=source_dir)
+    create_missing_classes(training_dir=training_dir, validation_dir=validation_dir)
 
     # Prepare training and validation datasets
-    training_set = build_dataset(recursive_dir, imres, "training")
+    training_set = build_dataset(training_dir, imres, "training")
     class_names = tuple(training_set.class_names)
     training_size = training_set.cardinality().numpy()
     training_set = training_set.unbatch().repeat().batch(batch_size)
 
     normalization_layer = tf.keras.layers.Rescaling(1. / 255)
-    validation_set = build_dataset(source_dir, subset='validation')
+    validation_set = build_dataset(validation_dir, subset='validation')
     validation_size = validation_set.cardinality().numpy()
     validation_set = validation_set.unbatch().batch(batch_size)
     validation_set = validation_set.map(lambda images, labels: (normalization_layer(images), labels))
 
     # Data augmentation
-    num_augmented_images = 100
     preprocessing_model = tf.keras.Sequential([normalization_layer])
     preprocessing_model.add(tf.keras.layers.RandomRotation(40))
     preprocessing_model.add(tf.keras.layers.RandomTranslation(0, 0.2))
@@ -213,16 +217,15 @@ def train_face_recognition_tf(recursive_dir='datasets_recursive', source_dir='da
     model.build((None,) + imres + (3,))
     model.summary()
 
-    epoch = 100
+    num_epochs = 10
     lr = 0.001
-    decay_rate = lr / epoch
+    decay_rate = lr / num_epochs
     model.compile(
         optimizer=tf.keras.optimizers.legacy.SGD(
             learning_rate=lr, momentum=0.9, nesterov=False, decay=decay_rate),
         loss=tf.keras.losses.CategoricalCrossentropy(from_logits=True, label_smoothing=0.1),
         metrics=['accuracy', tf.keras.metrics.TopKCategoricalAccuracy(name='top-5-accuracy')],
     )
-
     callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=6)
     reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.2, patience=3, min_lr=0.00001)
     checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
@@ -231,13 +234,12 @@ def train_face_recognition_tf(recursive_dir='datasets_recursive', source_dir='da
         save_best_only=True,
         save_weights_only=True,
     )
-
     steps_per_epoch = (training_size * num_augmented_images) // batch_size
     validation_steps = validation_size // batch_size
 
     hist = model.fit(
         training_set,
-        epochs=epoch,
+        epochs=num_epochs,
         steps_per_epoch=steps_per_epoch,
         validation_data=validation_set,
         validation_steps=validation_steps,
@@ -245,6 +247,7 @@ def train_face_recognition_tf(recursive_dir='datasets_recursive', source_dir='da
     ).history
     model.save(out_name)
     return model, hist
+
 
 def train_face_recognition_torch(recursive_dir='datasets_recursive', source_dir='datasets_anime', imres=(96, 96), out_name='models/saved_model.pt'):
     batch_size = 16
@@ -256,7 +259,7 @@ def train_face_recognition_torch(recursive_dir='datasets_recursive', source_dir=
             device = 'xpu'
         except: 
             device = "cpu"
-
+    
     create_missing_classes(training_dir=recursive_dir, validation_dir=source_dir)
 
     # Data transformations
@@ -268,11 +271,9 @@ def train_face_recognition_torch(recursive_dir='datasets_recursive', source_dir=
         transforms.ToTensor(),
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ])
-
     # Load datasets
     train_dataset = datasets.ImageFolder(root=recursive_dir, transform=data_transform)
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=2)
-
     validation_dataset = datasets.ImageFolder(root=source_dir, transform=data_transform)
     validation_loader = DataLoader(validation_dataset, batch_size=batch_size, shuffle=False, num_workers=2)
 
@@ -295,10 +296,8 @@ def train_face_recognition_torch(recursive_dir='datasets_recursive', source_dir=
         running_loss = 0.0
         train_correct = 0
         train_total = 0
-
         for images, labels in train_loader:
             images, labels = images.to(device), labels.to(device)
-
             optimizer.zero_grad()
             outputs = model(images)
             loss = criterion(outputs, labels)
@@ -312,13 +311,11 @@ def train_face_recognition_torch(recursive_dir='datasets_recursive', source_dir=
             train_correct += (predicted == labels).sum().item()
 
         train_accuracy = 100 * train_correct / train_total
-
         # Validation loop
         model.eval()
         val_loss = 0.0
         val_correct = 0
         val_total = 0
-
         with torch.no_grad():
             for images, labels in validation_loader:
                 images, labels = images.to(device), labels.to(device)
@@ -333,30 +330,30 @@ def train_face_recognition_torch(recursive_dir='datasets_recursive', source_dir=
                 val_correct += (predicted == labels).sum().item()
 
         val_accuracy = 100 * val_correct / val_total
-
         print(f"Epoch [{epoch+1}/{num_epochs}] - "
               f"Train Loss: {running_loss / len(train_loader):.4f}, "
               f"Train Accuracy: {train_accuracy:.2f}%, "
               f"Validation Loss: {val_loss / len(validation_loader):.4f}, "
               f"Validation Accuracy: {val_accuracy:.2f}%")
-
     # Save the trained model
     torch.save(model.state_dict(), out_name)
-
     return model
 
-def load_existing_model():
-    model = tf.keras.models.load_model('saved_model.h5',
+def load_existing_model(model_name='models/saved_model.h5'):
+    model = tf.keras.models.load_model(model_name,
        custom_objects={'KerasLayer':hub.KerasLayer})
     return model
 
-def classify_character(character, class_names, imres=(96, 96)):
-    files = os.listdir('datasets_anime' + '/' + character)
-    accuracy = np.array([], dtype=float)
+
+def classify_character_tf(character, class_names, imres=(96, 96), source_dir='datasets_anime', out_dir='datasets_recursive', model=None):
+    if model is None:
+        model = load_existing_model()
+    img_files = files_in_dir(os.path.join(source_dir,character)) # get full filenames
+    Nf = len(img_files)
+    accuracy = np.zeros(Nf)
     normalization_layer = tf.keras.layers.Rescaling(1. / 255)
     print(f"Character: {character}")
-    for img_file in files:
-        img_f = 'datasets_anime/' + character + '/' + img_file
+    for fidx,img_f in enumerate(img_files):
         img = tf.keras.utils.load_img(
             img_f , target_size=imres
         )
@@ -369,20 +366,13 @@ def classify_character(character, class_names, imres=(96, 96)):
 
         score = tf.nn.softmax(predictions[0])
 
-        found = False
-        if score != None:
+        if score is not None:
             predicted_index = np.argsort(score)[-5:][::-1]
-            for idx in predicted_index:
-                prediction_score = (100 * score[idx])
-
-                if class_names[idx] == character:
-                    found = True
-                    accuracy = np.append(accuracy, prediction_score)
-        if found == False:
-             accuracy = np.append(accuracy, 0)
+            for cidx in predicted_index:
+                if class_names[cidx] == character:
+                    accuracy[fidx] = 100*score[cidx]
     print(accuracy)
     histogram, edges = np.histogram(accuracy)
-
     # finding a decent threshold by looking for local minima and choosing the rightmost one
     local_minima = find_peaks(np.negative(histogram))
     if local_minima[0].size != 0:
@@ -391,26 +381,27 @@ def classify_character(character, class_names, imres=(96, 96)):
         # plt.stairs(histogram, edges, fill=True)
         # plt.show()
         for match in matches:
-            print('dataset_anime/' + character + '/' + files[match])
-            # print('dataset_recursive/' + character + '/' + files[c])
-            # shutil.copy('datasets_anime/' + character + '/' + files[c], 'datasets_recursive/' + character + '/' + files[c])
-        return (len(matches)/len(files))
+            file2 = os.path.join(out_dir,character,os.path.basename(img_files[match]))
+            print(f'Copying {img_files[match]} to {file2}')
+            shutil.copy(img_files[match],file2)
+        return (len(matches)/Nf)
     return 0
 
-def classify_all_characters():
-    training_set = build_dataset()
+
+def classify_all_characters_tf(in_dir='datasets_anime',out_dir='datasets_recursive',model_name='models/saved_model.h5'):
+    training_set = build_dataset(base_dir=in_dir)
     class_names = tuple(training_set.class_names)
-    characters = os.listdir('datasets_anime')
-    overall_matches = np.array([])
-    i = 1
-    for character in characters:
-        print(f'{i}/{len(characters)}')
-        detection_rate = classify_character(character, class_names)
-        overall_matches = np.append(overall_matches, detection_rate)
+    characters = os.listdir(in_dir)
+    C = len(characters)
+    overall_matches = np.zeros(C)
+    model = load_existing_model(model_name)
+    for idx,character in enumerate(characters):
+        print(f'{idx+1}/{C}')
+        detection_rate = classify_character_tf(character, class_names,source_dir=in_dir, out_dir=out_dir, model=model)
+        overall_matches[idx] = detection_rate
         print(detection_rate)
         print(overall_matches)
         print(f'Overall detection rate: {np.mean(overall_matches)}')
-        i += 1
 
 
 if __name__ == "__main__":
