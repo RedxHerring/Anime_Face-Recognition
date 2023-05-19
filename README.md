@@ -11,6 +11,9 @@ conda env create -f environment.yml
 If new modules are installed, update the yaml with
 conda env export > environment.yml
 
+Download models from https://drive.google.com/drive/folders/14kSKdc4b3xKzNqow7bELE9Qqby3h3iTE?usp=share_link
+Place them in the models/ directory
+
 To git push and pull, example for ssh given below:
 eval "$(ssh-agent -s)"
 ssh-add ~/.ssh/hpowell-id_ed25519

@@ -23,7 +23,6 @@ import torchvision
 from torchvision import transforms
 from torchvision import datasets
 from torchvision.models import efficientnet_v2_l
-# from intel_extension_for_pytorch import nn
 
 def train_image_type(base_dir='datasetsTON',imres=(96,96)):
     # Check if Intel Arc GPU is available
@@ -278,18 +277,7 @@ def train_face_recognition_torch(recursive_dir='datasets_recursive', source_dir=
     validation_loader = DataLoader(validation_dataset, batch_size=batch_size, shuffle=False, num_workers=2)
 
     # Define the model
-    model = nn.Sequential(
-        nn.Conv2d(3, 16, kernel_size=3, stride=1, padding=1),
-        nn.ReLU(),
-        nn.MaxPool2d(kernel_size=2),
-        nn.Conv2d(16, 32, kernel_size=3, stride=1, padding=1),
-        nn.ReLU(),
-        nn.MaxPool2d(kernel_size=2),
-        nn.Flatten(),
-        nn.Linear(32 * (imres[0] // 4) * (imres[1] // 4), 128),
-        nn.ReLU(),
-        nn.Linear(128, len(train_dataset.classes))
-    )
+    model = efficientnet_v2_l()
     # Define the loss function and optimizer
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=0.001)
@@ -300,7 +288,6 @@ def train_face_recognition_torch(recursive_dir='datasets_recursive', source_dir=
     criterion.to(device)
     if device == 'xpu':
         model, optimizer = ipex.optimize(model, optimizer=optimizer)
-    print(model)
     # Training loop
     num_epochs = 100
     for epoch in range(num_epochs):
@@ -428,6 +415,6 @@ def classify_all_characters():
 
 if __name__ == "__main__":
     # classify_image_type()
-    model, hist = train_face_recognition_torch()
+    # model, hist = train_face_recognition_tf()
     # model = load_existing_model()
     classify_all_characters()
