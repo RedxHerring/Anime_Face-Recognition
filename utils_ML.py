@@ -344,29 +344,29 @@ def get_img_score_tf(img_name, imres=(96,96), model=None):
     return tf.nn.softmax(predictions[0])
 
 
-def classify_character_tf(character, class_names, imres=(96, 96), source_dir='datasets_anime', out_dir='datasets_recursive', model=None, best_only=False):
+def classify_character_tf(character, class_names, imres=(96, 96), source_dir='datasets_anime', out_dir='datasets_recursive', model=None, best_only=False, a_thresh=.5):
     img_files = files_in_dir(os.path.join(source_dir,character)) # get full filenames
     Nf = len(img_files)
     accuracy = np.zeros(Nf)
     print(f"Character: {character}")
-    for fidx,img_f in enumerate(img_files):
+    for fidx,img_f in enumerate(img_files): # Loop through files
         score = get_img_score_tf(img_f,imres,model)
         if score is not None:
             predicted_index = np.argsort(score)[-5:][::-1]
             if best_only: # only consider the image if it's more likely to be this class than any other
                 cidx = predicted_index[0]
                 if class_names[cidx] == character:
-                    accuracy[fidx] = 100*score[cidx]
+                    accuracy[fidx] = score[cidx]
             else: # consider the image as long as one of its more likely classes is the right one
-                for cidx in predicted_index:
+                for cidx in predicted_index: # Loop through top 5 most likely classes
                     if class_names[cidx] == character:
-                        accuracy[fidx] = 100*score[cidx]
+                        accuracy[fidx] = score[cidx]
     print(accuracy)
     histogram, edges = np.histogram(accuracy)
     # finding a decent threshold by looking for local minima and choosing the rightmost one
     local_minima = find_peaks(np.negative(histogram))
     if local_minima[0].size != 0:
-        cutoff = edges[local_minima[0][-1]]
+        cutoff = max(a_thresh,edges[local_minima[0][-1]])
         matches = np.flatnonzero(accuracy >= cutoff)
         # plt.stairs(histogram, edges, fill=True)
         # plt.show()
@@ -378,16 +378,16 @@ def classify_character_tf(character, class_names, imres=(96, 96), source_dir='da
     return 0
 
 
-def classify_all_characters_tf(in_dir='datasets_anime', out_dir='datasets_recursive', model_name='models/saved_model.h5', best_only=False):
+def classify_all_characters_tf(in_dir='datasets_anime', out_dir='datasets_recursive', model_name='models/saved_model.h5', best_only=False, a_thresh=.5):
     training_set = build_dataset(base_dir=in_dir)
     class_names = tuple(training_set.class_names)
-    characters = os.listdir(in_dir)
+    characters = sorted(os.listdir(in_dir))
     C = len(characters)
     overall_matches = np.zeros(C)
     model = load_existing_model(model_name)
     for idx,character in enumerate(characters):
         print(f'{idx+1}/{C}')
-        detection_rate = classify_character_tf(character, class_names,source_dir=in_dir,out_dir=out_dir,model=model,best_only=best_only)
+        detection_rate = classify_character_tf(character, class_names,source_dir=in_dir,out_dir=out_dir,model=model,best_only=best_only,a_thresh=a_thresh)
         overall_matches[idx] = detection_rate
         print(detection_rate)
         print(overall_matches)
@@ -395,15 +395,31 @@ def classify_all_characters_tf(in_dir='datasets_anime', out_dir='datasets_recurs
 
 
 def classify_all_images_tf(in_dir='datasets_anime', out_dir='datasets_recursive', model_name='models/saved_model.h5', a_thresh=.5, imres=(96,96)):
-    training_set = build_dataset(base_dir=in_dir)
+    '''
+    INPUTS
+    in_dir - directory containing folders with images, or just images with no folders
+    out_dir - directory with a folder for each class, assumed to be built in advance
+    model_name - tensorflow trained model to use to classification
+    a_thresh - score to accept iamge as valid
+    imrs - tuple storing resolution of iamges used
+    '''
+    training_set = build_dataset(base_dir=out_dir)
     class_names = tuple(training_set.class_names)
     C = len(class_names)
     overall_matches = np.zeros(C)
     model = load_existing_model(model_name)
-    characters = os.listdir(in_dir)
-    for idx,character in enumerate(characters):
+    image_dirs = next(os.walk(in_dir))[1]
+    if len(image_dirs):
+        one_dir = False
+    else:
+        one_dir = True
+        image_dirs = [in_dir]
+    for idx,image_dir in enumerate(image_dirs):
         print(f'{idx+1}/{C}')
-        image_files = files_in_dir(os.path.join(in_dir,character))
+        if one_dir:
+            image_files = files_in_dir(image_dir)
+        else:
+            image_files = files_in_dir(os.path.join(in_dir,image_dir))
         for img_file in image_files:
             score = get_img_score_tf(img_file,imres,model)
             if score is not None:
