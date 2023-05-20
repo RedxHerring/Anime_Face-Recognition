@@ -2,7 +2,7 @@ import glob
 import os
 import shutil
 from utils import files_in_dir, initialize_training_set
-from utils_ML import train_image_type, classify_image_type, train_face_recognition_tf, classify_all_characters_tf
+from utils_ML import train_image_type, classify_image_type, train_face_recognition_tf, classify_all_characters_tf, load_existing_model
 
 def filter_dataset_by_imagetype(dataset_dir_in="datasets_base",dataset_dir_out="datasets_anime",rejected_dir_top="Images/rejected_images",model=None):
     '''
@@ -31,21 +31,32 @@ def filter_dataset_by_imagetype(dataset_dir_in="datasets_base",dataset_dir_out="
 
 
 if __name__ == "__main__":
-    # model = train_image_type() # Train dataset to identify faces from this anime vvs other anime or from real life
-    # filter_dataset_by_imagetype("datasets_base","datasets_anime",model=model) # Use this model to filter downloaded images into datasets_anime
-    # # Create initial training set using just images from myanimelist.
-    # initialize_training_set(out_dir='Images/myanimelist-training')
-    # shutil.copytree('Images/myanimelist-training','datasets_iterative0',dirs_exist_ok=True)
-    # # Train initial set, saving but not returning model so we don't have to run all of this at once
-    # train_face_recognition_tf(training_dir='datasets_iterative0',out_name='models/FRmodel0.h5',num_augmented_images=150)
-    # # Create next dataset using this model
-    # shutil.copytree('Images/myanimelist-training','datasets_iterative1',dirs_exist_ok=True)
-    # classify_all_characters_tf('datasets_anime','datasets_iterative1')
+    '''
+    # Assume we are starting with a dataset of downloaded images using get_character_images() from utils.py
+    model = train_image_type() # Train dataset to identify faces from this anime vs other anime or from real life
+    filter_dataset_by_imagetype("datasets_base","datasets_anime",model=model) # Use this model to filter downloaded images into datasets_anime
+    # Create initial training set using just images from myanimelist.
+    initialize_training_set(out_dir='Images/myanimelist-training')
+    # Copy this one-image-per-class set to to first iteration training set.
+    shutil.copytree('Images/myanimelist-training','datasets_iterative0',dirs_exist_ok=True)
+    # Train initial set, saving but not returning model so we don't have to run all of this at once
+    train_face_recognition_tf(training_dir='datasets_iterative0',out_name='models/FRmodel0.h5',num_augmented_images=150)
+    # Create next dataset using this model
+    shutil.copytree('Images/myanimelist-training','datasets_iterative1',dirs_exist_ok=True)
+    classify_all_characters_tf('datasets_anime','datasets_iterative1')
     # Train next set, saving but not returning model so we don't have to run all of this at once
     train_face_recognition_tf(training_dir='datasets_iterative1',out_name='models/FRmodel1.h5',num_augmented_images=50)
     # Create next dataset using this model
     shutil.copytree('Images/myanimelist-training','datasets_iterative2',dirs_exist_ok=True)
     classify_all_characters_tf('datasets_anime','datasets_iterative2',model_name='models/FRmodel1.h5')
+    '''
+    # Load model back in to speed up training. In this run we will bump up regularization to clean out bad images that only exist due to overfitting.
+    model = load_existing_model('models/FRmodel1.h5')
+    # Train next set, saving but not returning model so we don't have to run all of this at once.
+    train_face_recognition_tf(training_dir='datasets_iterative2',out_name='models/FRmodel2.h5',num_augmented_images=40,reg=.5,model=model)
+    # Create next dataset using this model
+    shutil.copytree('Images/myanimelist-training','datasets_iterative3',dirs_exist_ok=True)
+    classify_all_characters_tf('datasets_anime','datasets_iterative3',model_name='models/FRmodel2.h5')
 
 
 

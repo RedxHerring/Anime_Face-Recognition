@@ -26,20 +26,6 @@ from torchvision.models import efficientnet_v2_l
 
 
 def train_image_type(base_dir='datasetsTON',imres=(96,96),out_name='models/image_type_classifier_model.h5'):
-    # Check if Intel Arc GPU is available
-    intel_arc_available = tf.config.list_physical_devices("GPU")
-    if intel_arc_available and "ARC" in intel_arc_available[0].name:
-        os.environ["TF_ADJUST_HUB_FALLBACK_TIMEOUT"] = "600"  # Increase the timeout for loading TensorFlow Hub models on Intel Arc GPU
-        os.environ["TFHUB_MODEL_LOAD_FORMAT"] = "COMPRESSED"  # Set the model load format for TensorFlow Hub
-
-        # Use Intel extension for TensorFlow (oneAPI)
-        import tensorflow.oneapi as tfoneapi
-        tfoneapi.initialize()
-    # Enable GPU acceleration
-    physical_devices = tf.config.list_physical_devices("GPU")
-    if len(physical_devices) > 0:
-        tf.config.experimental.set_memory_growth(physical_devices[0], True)
-
     # Set up the CNN model
     model = keras.Sequential([
         layers.Conv2D(32, (3, 3), activation='relu', input_shape=(imres[0], imres[1], 3)),
@@ -57,7 +43,6 @@ def train_image_type(base_dir='datasetsTON',imres=(96,96),out_name='models/image
     model.compile(optimizer='adam',
                 loss='categorical_crossentropy',
                 metrics=['accuracy'])
-
     # Data augmentation to improve generalization
     datagen = ImageDataGenerator(
         rescale=1./255,
@@ -85,7 +70,6 @@ def train_image_type(base_dir='datasetsTON',imres=(96,96),out_name='models/image
         files = os.listdir(class_dir)
         num_validation_files = int(validation_split * len(files))
         validation_files = random.sample(files, num_validation_files)
-
         # Move validation files to validation directory
         for file_name in validation_files:
             src_path = os.path.join(class_dir, file_name)
@@ -121,11 +105,9 @@ def train_image_type(base_dir='datasetsTON',imres=(96,96),out_name='models/image
     # Extract accuracy values from the training history
     training_accuracy = history.history['accuracy']
     validation_accuracy = history.history['val_accuracy']
-
     # Print accuracy for each epoch
     for epoch in range(epochs):
         print(f"Epoch {epoch+1} - Training Accuracy: {training_accuracy[epoch]:.4f} - Validation Accuracy: {validation_accuracy[epoch]:.4f}")
-
     # Save the trained model
     model.save(out_name)
     return model
@@ -178,7 +160,7 @@ def build_dataset(base_dir='datasets_recursive', imres=(96, 96), subset='trainin
         batch_size=1)
 
 
-def train_face_recognition_tf(training_dir='datasets_training', validation_dir='datasets_anime', imres=(96, 96), num_augmented_images=100, out_name='models/saved_model.h5'):
+def train_face_recognition_tf(training_dir='datasets_training', validation_dir='datasets_anime', imres=(96, 96), num_augmented_images=100, out_name='models/saved_model.h5', reg=.01, model=None):
     batch_size = 16
     checkpoint_path = "checkpt"
 
@@ -207,16 +189,19 @@ def train_face_recognition_tf(training_dir='datasets_training', validation_dir='
         preprocessing_model(images), labels)).repeat(num_augmented_images)
 
     do_fine_tuning = True
-    model = tf.keras.Sequential([
-        tf.keras.layers.InputLayer(input_shape=imres + (3,)),
-        hub.KerasLayer('https://tfhub.dev/tensorflow/efficientnet/b7/feature-vector/1', trainable=do_fine_tuning),
-        tf.keras.layers.Dropout(rate=0.7),
-        tf.keras.layers.Dense(len(class_names),
-                              kernel_regularizer=tf.keras.regularizers.l2(0.05))
-    ])
-    model.build((None,) + imres + (3,))
-    model.summary()
-
+    if model is None:
+        model = tf.keras.Sequential([
+            tf.keras.layers.InputLayer(input_shape=imres + (3,)),
+            hub.KerasLayer('https://tfhub.dev/tensorflow/efficientnet/b7/feature-vector/1', trainable=do_fine_tuning),
+            tf.keras.layers.Dropout(rate=0.7),
+            tf.keras.layers.Dense(len(class_names),
+                                kernel_regularizer=tf.keras.regularizers.l2(reg))
+        ])
+    else:
+        # Update the l2 regularization of the input model
+        for layer in model.layers:
+            if isinstance(layer, tf.keras.layers.Dense):
+                layer.kernel_regularizer = tf.keras.regularizers.l2(reg)
     num_epochs = 10
     lr = 0.001
     decay_rate = lr / num_epochs
