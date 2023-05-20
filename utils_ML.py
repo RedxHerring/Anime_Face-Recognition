@@ -160,8 +160,9 @@ def build_dataset(base_dir='datasets_recursive', imres=(96, 96), subset='trainin
         batch_size=1)
 
 
-def train_face_recognition_tf(training_dir='datasets_training', validation_dir='datasets_anime', imres=(96, 96), num_augmented_images=100, out_name='models/saved_model.h5', reg=.01, model=None):
-    batch_size = 16
+def train_face_recognition_tf(training_dir='datasets_training', validation_dir='datasets_anime', imres=(96, 96), num_augmented_images=100, out_name='models/saved_model.h5', 
+                            batch_size=16, reg=.01, drprate=.7, num_epochs=5, lr=.001, model=None):
+    
     checkpoint_path = "checkpt"
 
     create_missing_classes(training_dir=training_dir, validation_dir=validation_dir)
@@ -193,7 +194,7 @@ def train_face_recognition_tf(training_dir='datasets_training', validation_dir='
         model = tf.keras.Sequential([
             tf.keras.layers.InputLayer(input_shape=imres + (3,)),
             hub.KerasLayer('https://tfhub.dev/tensorflow/efficientnet/b7/feature-vector/1', trainable=do_fine_tuning),
-            tf.keras.layers.Dropout(rate=0.7),
+            tf.keras.layers.Dropout(rate=drprate),
             tf.keras.layers.Dense(len(class_names),
                                 kernel_regularizer=tf.keras.regularizers.l2(reg))
         ])
@@ -202,8 +203,6 @@ def train_face_recognition_tf(training_dir='datasets_training', validation_dir='
         for layer in model.layers:
             if isinstance(layer, tf.keras.layers.Dense):
                 layer.kernel_regularizer = tf.keras.regularizers.l2(reg)
-    num_epochs = 10
-    lr = 0.001
     decay_rate = lr / num_epochs
     model.compile(
         optimizer=tf.keras.optimizers.legacy.SGD(
@@ -330,27 +329,28 @@ def load_existing_model(model_name='models/saved_model.h5'):
     return model
 
 
-def classify_character_tf(character, class_names, imres=(96, 96), source_dir='datasets_anime', out_dir='datasets_recursive', model=None, best_only=False):
+def get_img_score_tf(img_name, imres=(96,96), model=None):
     if model is None:
         model = load_existing_model()
+    img = tf.keras.utils.load_img(
+        img_name , target_size=imres
+    )
+    img_array = tf.keras.utils.img_to_array(img)
+    img_array = tf.expand_dims(img_array, 0) # Create a batch
+    normalization_layer = tf.keras.layers.Rescaling(1. / 255)
+    img_array = normalization_layer(img_array)
+    image = img_array[0,:,:,:]
+    predictions = model.predict(img_array)
+    return tf.nn.softmax(predictions[0])
+
+
+def classify_character_tf(character, class_names, imres=(96, 96), source_dir='datasets_anime', out_dir='datasets_recursive', model=None, best_only=False):
     img_files = files_in_dir(os.path.join(source_dir,character)) # get full filenames
     Nf = len(img_files)
     accuracy = np.zeros(Nf)
-    normalization_layer = tf.keras.layers.Rescaling(1. / 255)
     print(f"Character: {character}")
     for fidx,img_f in enumerate(img_files):
-        img = tf.keras.utils.load_img(
-            img_f , target_size=imres
-        )
-        img_array = tf.keras.utils.img_to_array(img)
-        img_array = tf.expand_dims(img_array, 0) # Create a batch
-
-        img_array = normalization_layer(img_array)
-        image = img_array[0,:,:,:]
-        predictions = model.predict(img_array)
-
-        score = tf.nn.softmax(predictions[0])
-
+        score = get_img_score_tf(img_f,imres,model)
         if score is not None:
             predicted_index = np.argsort(score)[-5:][::-1]
             if best_only: # only consider the image if it's more likely to be this class than any other
@@ -392,6 +392,28 @@ def classify_all_characters_tf(in_dir='datasets_anime', out_dir='datasets_recurs
         print(detection_rate)
         print(overall_matches)
         print(f'Overall detection rate: {np.mean(overall_matches)}')
+
+
+def classify_all_images_tf(in_dir='datasets_anime', out_dir='datasets_recursive', model_name='models/saved_model.h5', a_thresh=.5, imres=(96,96)):
+    training_set = build_dataset(base_dir=in_dir)
+    class_names = tuple(training_set.class_names)
+    C = len(class_names)
+    overall_matches = np.zeros(C)
+    model = load_existing_model(model_name)
+    characters = os.listdir(in_dir)
+    for idx,character in enumerate(characters):
+        print(f'{idx+1}/{C}')
+        image_files = files_in_dir(os.path.join(in_dir,character))
+        for img_file in image_files:
+            score = get_img_score_tf(img_file,imres,model)
+            if score is not None:
+                if max(score) > a_thresh:
+                    cidx = np.argmax(score)
+                    print(f'{img_file} found to be member of {class_names[cidx]} with score {max(score)}.')
+                    shutil.copy(img_file,os.path.join(out_dir,class_names[cidx],os.path.basename(img_file)))
+
+
+    
 
 
 if __name__ == "__main__":
