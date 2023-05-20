@@ -330,7 +330,7 @@ def load_existing_model(model_name='models/saved_model.h5'):
     return model
 
 
-def classify_character_tf(character, class_names, imres=(96, 96), source_dir='datasets_anime', out_dir='datasets_recursive', model=None):
+def classify_character_tf(character, class_names, imres=(96, 96), source_dir='datasets_anime', out_dir='datasets_recursive', model=None, best_only=False):
     if model is None:
         model = load_existing_model()
     img_files = files_in_dir(os.path.join(source_dir,character)) # get full filenames
@@ -353,9 +353,14 @@ def classify_character_tf(character, class_names, imres=(96, 96), source_dir='da
 
         if score is not None:
             predicted_index = np.argsort(score)[-5:][::-1]
-            for cidx in predicted_index:
+            if best_only: # only consider the image if it's more likely to be this class than any other
+                cidx = predicted_index[0]
                 if class_names[cidx] == character:
                     accuracy[fidx] = 100*score[cidx]
+            else: # consider the image as long as one of its more likely classes is the right one
+                for cidx in predicted_index:
+                    if class_names[cidx] == character:
+                        accuracy[fidx] = 100*score[cidx]
     print(accuracy)
     histogram, edges = np.histogram(accuracy)
     # finding a decent threshold by looking for local minima and choosing the rightmost one
@@ -373,7 +378,7 @@ def classify_character_tf(character, class_names, imres=(96, 96), source_dir='da
     return 0
 
 
-def classify_all_characters_tf(in_dir='datasets_anime',out_dir='datasets_recursive',model_name='models/saved_model.h5'):
+def classify_all_characters_tf(in_dir='datasets_anime', out_dir='datasets_recursive', model_name='models/saved_model.h5', best_only=False):
     training_set = build_dataset(base_dir=in_dir)
     class_names = tuple(training_set.class_names)
     characters = os.listdir(in_dir)
@@ -382,7 +387,7 @@ def classify_all_characters_tf(in_dir='datasets_anime',out_dir='datasets_recursi
     model = load_existing_model(model_name)
     for idx,character in enumerate(characters):
         print(f'{idx+1}/{C}')
-        detection_rate = classify_character_tf(character, class_names,source_dir=in_dir, out_dir=out_dir, model=model)
+        detection_rate = classify_character_tf(character, class_names,source_dir=in_dir,out_dir=out_dir,model=model,best_only=best_only)
         overall_matches[idx] = detection_rate
         print(detection_rate)
         print(overall_matches)

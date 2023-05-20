@@ -53,10 +53,11 @@ if __name__ == "__main__":
     # Load model back in to speed up training. In this run we will bump up regularization to clean out bad images that only exist due to overfitting.
     model = load_existing_model('models/FRmodel1.h5')
     # Train next set, saving but not returning model so we don't have to run all of this at once.
-    train_face_recognition_tf(training_dir='datasets_iterative2',out_name='models/FRmodel2.h5',num_augmented_images=40,reg=.5,model=model)
-    # Create next dataset using this model
+    train_face_recognition_tf(training_dir='datasets_iterative2',out_name='models/FRmodel2.h5',num_augmented_images=40,reg=20,model=model)
+    # Create next dataset using this model.
     shutil.copytree('Images/myanimelist-training','datasets_iterative3',dirs_exist_ok=True)
-    classify_all_characters_tf('datasets_anime','datasets_iterative3',model_name='models/FRmodel2.h5')
+    # We set best_only to true so that if a chracter is similar but in the wrong set, it will be passed over as long as its true class is more likely.
+    classify_all_characters_tf('datasets_anime','datasets_iterative3',model_name='models/FRmodel2.h5',best_only=True)
 
 
 
