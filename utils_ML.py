@@ -328,7 +328,7 @@ def load_existing_model(model_name='models/saved_model.h5'):
     return model
 
 
-def get_img_score_tf(img_name, imres=(96,96), model=None):
+def get_img_scores_tf(img_name, imres=(96,96), model=None):
     warnings.filterwarnings("ignore")
     if model is None:
         model = load_existing_model()
@@ -351,29 +351,30 @@ def classify_character_tf(character, class_names, imres=(96, 96), source_dir='da
     '''
     img_files = files_in_dir(os.path.join(source_dir,character)) # get full filenames
     Nf = len(img_files)
-    accuracy = np.zeros(Nf)
+    accuracies = np.zeros(Nf)
     for fidx,img_f in enumerate(img_files): # Loop through files
-        score = get_img_score_tf(img_f,imres,model)
-        if score is not None:
-            predicted_index = np.argsort(score)[-5:][::-1]
+        scores = get_img_scores_tf(img_f,imres,model)
+        if scores is not None:
+            predicted_index = np.argsort(scores)[-5:][::-1]
             if best_only: # only consider the image if it's more likely to be this class than any other
                 cidx = predicted_index[0]
                 if class_names[cidx] == character:
-                    accuracy[fidx] = score[cidx]
+                    accuracies[fidx] = scores[cidx]
             else: # consider the image as long as one of its more likely classes is the right one
                 for cidx in predicted_index: # Loop through top 5 most likely classes
                     if class_names[cidx] == character:
-                        accuracy[fidx] = score[cidx]
-    histogram, edges = np.histogram(accuracy)
+                        accuracies[fidx] = scores[cidx]
+    histogram, edges = np.histogram(accuracies)
     # finding a decent threshold by looking for local minima and choosing the rightmost one
     local_minima = find_peaks(np.negative(histogram))
     if local_minima[0].size != 0:
         cutoff = min(ac_max,max(ac_min,edges[local_minima[0][-1]]))
-        matches = np.flatnonzero(accuracy >= cutoff)
-        if len(matches) > nmatches_thresh: # so many matches that we need to be more selective
-            num_accept = (len(matches)+2*nmatches_thresh)//3 # weighted average that takes into account this class
-            cutoff = np.sort(accuracy)[-num_accept]
-            matches = np.flatnonzero(accuracy >= cutoff)
+        is_match = accuracies >= cutoff
+        if sum(is_match) > nmatches_thresh: # so many matches that we need to be more selective
+            num_accept = (sum(is_match)+2*nmatches_thresh)//3 # weighted average that takes into account this class
+            cutoff = np.sort(accuracies)[-num_accept]
+            is_match = accuracies >= cutoff
+        matches = np.flatnonzero(is_match)
         # plt.stairs(histogram, edges, fill=True)
         # plt.show()
         for match in matches:
@@ -402,13 +403,14 @@ def classify_all_characters_tf(in_dir='datasets_anime', out_dir='datasets_recurs
     print(f'Overall detection rate: {np.mean(overall_matches)}')
 
 
-def classify_all_images_tf(in_dir='datasets_anime', out_dir='datasets_recursive', model_name='models/saved_model.h5', a_thresh=.5, imres=(96,96)):
+def classify_all_images_tf(in_dir='datasets_anime', out_dir='datasets_recursive', model_name='models/saved_model.h5', ac_thresh=.5, imres=(96,96), 
+                            nmatches_thresh=100, use_hists=True):
     '''
     INPUTS
     in_dir - directory containing folders with images, or just images with no folders
     out_dir - directory with a folder for each class, assumed to be built in advance
     model_name - tensorflow trained model to use to classification
-    a_thresh - score to accept iamge as valid
+    a_thresh - score to accept image as valid
     imrs - tuple storing resolution of images used
     '''
     training_set = build_dataset(base_dir=out_dir)
@@ -418,30 +420,60 @@ def classify_all_images_tf(in_dir='datasets_anime', out_dir='datasets_recursive'
     model = load_existing_model(model_name)
     image_dirs = next(os.walk(in_dir))[1]
     if len(image_dirs):
-        one_dir = False
+        imgs_list = []
+        for image_dir in image_dirs:
+            imgs_list.extend(files_in_dir(os.path.join(in_dir,image_dir)))
     else:
-        one_dir = True
-        image_dirs = [in_dir]
-    for idx,image_dir in enumerate(image_dirs):
-        print(f'{idx+1}/{C}')
-        if one_dir:
-            image_files = files_in_dir(image_dir)
-        else:
-            image_files = files_in_dir(os.path.join(in_dir,image_dir))
-        for img_file in image_files:
-            score = get_img_score_tf(img_file,imres,model)
+        imgs_list = files_in_dir(in_dir)
+    # Now either sort files globally or decide individually
+    if use_hists:
+        Nf = len(imgs_list)
+        # Initialize matrix to store all scores for all files and all classes
+        scores_mat = np.zeros((Nf,C))
+        # Initialize matrix to store class index in 0th column and best score in 1st
+        scores_CS = np.zeros((Nf,2))
+        for idx, img_file in enumerate(imgs_list):
+            scores = get_img_scores_tf(img_file,imres,model)
+            if scores is not None:
+                scores_mat[idx,:] = scores
+                scores_CS[idx,0] = np.argmax(scores)
+                scores_CS[idx,1] = max(scores)
+        # Having looped through all files, we can decide how well a file fits a given class globally
+        for idx in range(C):
+            is_class = scores_CS[:,0]==idx
+            if not np.any(is_class):
+                continue
+            accuracies = scores_CS[is_class,1] # get scores for each image that has this class as its best
+            histogram, edges = np.histogram(accuracies)
+            # finding a decent threshold by looking for local minima and choosing the rightmost one
+            local_minima = find_peaks(np.negative(histogram))
+            if local_minima[0].size:
+                cutoff = max(ac_thresh,edges[local_minima[0][-1]])
+                is_match = accuracies >= cutoff
+                if sum(is_match) > nmatches_thresh: # so many matches that we need to be more selective
+                    num_accept = (sum(is_match)+2*nmatches_thresh)//3 # weighted average that takes into account this class
+                    cutoff = (cutoff + 2*np.sort(accuracies)[-num_accept])/3 # weighted average to create new cutoff
+                    is_match = accuracies >= cutoff
+                matches = np.flatnonzero(is_class)[np.flatnonzero(is_match)]
+                for match in matches:
+                    file2 = os.path.join(out_dir,character,os.path.basename(imgs_list[match]))
+                    print(f'Copying {imgs_list[match]} to {file2}')
+                    shutil.copy(imgs_list[match],file2)
+                print(f"Class {idx} - {class_names[idx]}: Cutoff of {cutoff} score led to {len(matches)}/{sum(is_class)} = {len(matches)/sum(is_class)}")
+    else:
+        for img_file in imgs_list:
+            score = get_img_scores_tf(img_file,imres,model)
             if score is not None:
-                if max(score) > a_thresh:
+                if max(score) > ac_thresh:
                     cidx = np.argmax(score)
                     print(f'{img_file} found to be member of {class_names[cidx]} with score {max(score)}.')
                     shutil.copy(img_file,os.path.join(out_dir,class_names[cidx],os.path.basename(img_file)))
+    
     for character in os.listdir(out_dir):
         # Check for duplicates.
         remove_duplicates(os.path.join(out_dir,character))
 
 
-
-    
 
 
 if __name__ == "__main__":
