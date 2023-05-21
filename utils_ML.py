@@ -344,11 +344,14 @@ def get_img_score_tf(img_name, imres=(96,96), model=None):
     return tf.nn.softmax(predictions[0])
 
 
-def classify_character_tf(character, class_names, imres=(96, 96), source_dir='datasets_anime', out_dir='datasets_recursive', model=None, best_only=False, ac_min=.1,ac_max=.6):
+def classify_character_tf(character, class_names, imres=(96, 96), source_dir='datasets_anime', out_dir='datasets_recursive', model=None, best_only=False, ac_min=.1,ac_max=.6,nmatches_thresh=50):
+    '''
+    INPUTS
+    nmatches_thresh - if we get more matches than this we should move our cutoff threshold up significantly
+    '''
     img_files = files_in_dir(os.path.join(source_dir,character)) # get full filenames
     Nf = len(img_files)
     accuracy = np.zeros(Nf)
-    print(f"Character: {character}")
     for fidx,img_f in enumerate(img_files): # Loop through files
         score = get_img_score_tf(img_f,imres,model)
         if score is not None:
@@ -367,12 +370,17 @@ def classify_character_tf(character, class_names, imres=(96, 96), source_dir='da
     if local_minima[0].size != 0:
         cutoff = min(ac_max,max(ac_min,edges[local_minima[0][-1]]))
         matches = np.flatnonzero(accuracy >= cutoff)
+        if len(matches) > nmatches_thresh: # so many matches that we need to be more selective
+            num_accept = (len(matches)+2*nmatches_thresh)//3 # weighted average that takes into account this class
+            cutoff = np.sort(accuracy)[-num_accept]
+            matches = np.flatnonzero(accuracy >= cutoff)
         # plt.stairs(histogram, edges, fill=True)
         # plt.show()
         for match in matches:
             file2 = os.path.join(out_dir,character,os.path.basename(img_files[match]))
             print(f'Copying {img_files[match]} to {file2}')
             shutil.copy(img_files[match],file2)
+        print(f"Cutoff of {cutoff} score led to {len(matches)}/{Nf} = {len(matches)/Nf}")
         return (len(matches)/Nf)
     return 0
 
@@ -385,12 +393,11 @@ def classify_all_characters_tf(in_dir='datasets_anime', out_dir='datasets_recurs
     overall_matches = np.zeros(C)
     model = load_existing_model(model_name)
     for idx,character in enumerate(characters):
-        print(f'{idx+1}/{C}')
+        print(f'{idx+1}/{C}: Character: {character}')
         detection_rate = classify_character_tf(character, class_names,source_dir=in_dir,out_dir=out_dir,model=model,best_only=best_only,ac_min=ac_min,ac_max=ac_max)
         # Check for duplicates.
         remove_duplicates(os.path.join(out_dir,character))
         overall_matches[idx] = detection_rate
-        print(detection_rate)
     print(overall_matches)
     print(f'Overall detection rate: {np.mean(overall_matches)}')
 
@@ -402,7 +409,7 @@ def classify_all_images_tf(in_dir='datasets_anime', out_dir='datasets_recursive'
     out_dir - directory with a folder for each class, assumed to be built in advance
     model_name - tensorflow trained model to use to classification
     a_thresh - score to accept iamge as valid
-    imrs - tuple storing resolution of iamges used
+    imrs - tuple storing resolution of images used
     '''
     training_set = build_dataset(base_dir=out_dir)
     class_names = tuple(training_set.class_names)

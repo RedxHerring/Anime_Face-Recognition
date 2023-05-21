@@ -41,7 +41,6 @@ if __name__ == "__main__":
     shutil.copytree('Images/myanimelist-training','datasets_iterative0',dirs_exist_ok=True)
     # Train initial set, saving but not returning model so we don't have to run all of this at once
     train_face_recognition_tf(training_dir='datasets_iterative0',out_name='models/FRmodel0.h5',num_augmented_images=150)
-    '''
     # Create next dataset using this model
     shutil.copytree('Images/myanimelist-training','datasets_iterative1',dirs_exist_ok=True)
     # We set a value for a_thresh so that noisier class folders don't accidentally let images though just because they're on top of the mud pile.
@@ -52,8 +51,8 @@ if __name__ == "__main__":
     train_face_recognition_tf(training_dir='datasets_iterative1',out_name='models/FRmodel1.h5',num_augmented_images=100,reg=.1,model=model)
     # Create next dataset using this model
     shutil.copytree('Images/myanimelist-training','datasets_iterative2',dirs_exist_ok=True)
-    classify_all_characters_tf('datasets_anime','datasets_iterative2',model_name='models/FRmodel1.h5',ac_min=.16,ac_max=.25)
-    
+    classify_all_characters_tf('datasets_anime','datasets_iterative2',model_name='models/FRmodel1.h5',ac_min=.16,ac_max=.4)
+    '''
     # Load model back in to speed up training. In this run we will bump up regularization to clean out bad images that only exist due to overfitting.
     model = load_existing_model('models/FRmodel1.h5')
     # Train next set, saving but not returning model so we don't have to run all of this at once.
@@ -61,7 +60,7 @@ if __name__ == "__main__":
     # Create next dataset using this model.
     shutil.copytree('Images/myanimelist-training','datasets_iterative3',dirs_exist_ok=True)
     # We set best_only to true so that if a character is similar but in the wrong set, it will be passed over as long as its true class is more likely.
-    classify_all_characters_tf('datasets_anime','datasets_iterative3',model_name='models/FRmodel2.h5',best_only=True, ac_min=.2,ac_max=.3)
+    classify_all_characters_tf('datasets_anime','datasets_iterative3',model_name='models/FRmodel2.h5',best_only=True, ac_min=.2,ac_max=.6)
     
     # Load model back in to speed up training. In this run we will bump up regularization to clean out bad images that only exist due to overfitting.
     model = load_existing_model('models/FRmodel2.h5')
@@ -70,7 +69,7 @@ if __name__ == "__main__":
     # Create next dataset using this model.
     shutil.copytree('Images/myanimelist-training','datasets_iterative4',dirs_exist_ok=True)
     # We set best_only to true so that if a chracter is similar but in the wrong set, it will be passed over as long as its true class is more likely.
-    classify_all_images_tf('datasets_anime','datasets_iterative4',model_name='models/FRmodel3.h5',ac_min=.22,ac_max=.35)
+    classify_all_images_tf('datasets_anime','datasets_iterative4',model_name='models/FRmodel3.h5',a_thresh=.6)
 
     # Create one last model using this final dataset
     model = load_existing_model('models/FRmodel3.h5')
@@ -79,7 +78,7 @@ if __name__ == "__main__":
     # Classify images from anime episode based on this final model
     shutil.copytree('Images/myanimelist-training','datasets_from_one',dirs_exist_ok=True)
     # We set best_only to true so that if a chracter is similar but in the wrong set, it will be passed over as long as its true class is more likely.
-    classify_all_images_tf('datasetsTON/this_anime','datasets_predict',model_name='models/FRmodel4.h5',ac_min=.25,ac_max=.4)
+    classify_all_images_tf('datasetsTON/this_anime','datasets_predict',model_name='models/FRmodel4.h5',a_thresh=.3)
 
 # # Create next dataset using this model.
 # shutil.copytree('Images/myanimelist-training','datasets_from_one',dirs_exist_ok=True)
