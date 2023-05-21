@@ -61,12 +61,15 @@ if __name__ == "__main__":
     '''
     # Create next dataset using this model.
     shutil.copytree('Images/myanimelist-training','datasets_iterative3',dirs_exist_ok=True)
-    classify_all_images_tf('datasetsTON/this_anime','datasets_iterative3',model_name='models/FRmodel2.h5',ac_thresh=.4)
+    # Get images from download images
+    classify_all_characters_tf('datasets_anime','datasets_iterative3',model_name='models/FRmodel2.h5',ac_min=.25,ac_max=.75, best_only=True)
+    # Get images cropped from the anime
+    classify_all_images_tf('datasetsTON/this_anime','datasets_iterative3',model_name='models/FRmodel2.h5',ac_thresh=.75)
 
     # Create one last model using this final dataset
     model = load_existing_model('models/FRmodel2.h5')
     # Train next set, saving but not returning model so we don't have to run all of this at once.
-    train_face_recognition_tf(training_dir='datasets_iterative3',out_name='models/FRmodel3.h5',num_augmented_images=45,reg=20,model=model)
+    train_face_recognition_tf(training_dir='datasets_iterative3',out_name='models/FRmodel3.h5',num_augmented_images=60,reg=20,model=model)
     # Classify images from anime episode based on this final model
     shutil.copytree('Images/myanimelist-training','datasets_predict',dirs_exist_ok=True)
     # We set best_only to true so that if a chracter is similar but in the wrong set, it will be passed over as long as its true class is more likely.

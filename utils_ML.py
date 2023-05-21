@@ -372,7 +372,7 @@ def classify_character_tf(character, class_names, imres=(96, 96), source_dir='da
         is_match = accuracies >= cutoff
         if sum(is_match) > nmatches_thresh: # so many matches that we need to be more selective
             num_accept = (sum(is_match)+2*nmatches_thresh)//3 # weighted average that takes into account this class
-            cutoff = np.sort(accuracies)[-num_accept]
+            cutoff = (cutoff + 2*np.sort(accuracies)[-num_accept])/3 # weighted average to create new cutoff
             is_match = accuracies >= cutoff
         matches = np.flatnonzero(is_match)
         # plt.stairs(histogram, edges, fill=True)
@@ -456,7 +456,7 @@ def classify_all_images_tf(in_dir='datasets_anime', out_dir='datasets_recursive'
                     is_match = accuracies >= cutoff
                 matches = np.flatnonzero(is_class)[np.flatnonzero(is_match)]
                 for match in matches:
-                    file2 = os.path.join(out_dir,character,os.path.basename(imgs_list[match]))
+                    file2 = os.path.join(out_dir,class_names[idx],os.path.basename(imgs_list[match]))
                     print(f'Copying {imgs_list[match]} to {file2}')
                     shutil.copy(imgs_list[match],file2)
                 print(f"Class {idx} - {class_names[idx]}: Cutoff of {cutoff} score led to {len(matches)}/{sum(is_class)} = {len(matches)/sum(is_class)}")
