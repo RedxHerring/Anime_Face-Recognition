@@ -3,6 +3,7 @@ import tensorflow_hub as hub
 import numpy as np
 import glob
 import os
+import warnings
 import random
 import shutil
 import matplotlib.pyplot as plt
@@ -13,7 +14,7 @@ from tensorflow.keras import layers
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.preprocessing.image import load_img, img_to_array
 
-from utils import files_in_dir
+from utils import files_in_dir, remove_duplicates
 
 import cv2
 import torch
@@ -162,9 +163,8 @@ def build_dataset(base_dir='datasets_recursive', imres=(96, 96), subset='trainin
 
 def train_face_recognition_tf(training_dir='datasets_training', validation_dir='datasets_anime', imres=(96, 96), num_augmented_images=100, out_name='models/saved_model.h5', 
                             batch_size=16, reg=.01, drprate=.7, num_epochs=5, lr=.001, model=None):
-    
+    warnings.filterwarnings("ignore")
     checkpoint_path = "checkpt"
-
     create_missing_classes(training_dir=training_dir, validation_dir=validation_dir)
 
     # Prepare training and validation datasets
@@ -178,7 +178,6 @@ def train_face_recognition_tf(training_dir='datasets_training', validation_dir='
     validation_size = validation_set.cardinality().numpy()
     validation_set = validation_set.unbatch().batch(batch_size)
     validation_set = validation_set.map(lambda images, labels: (normalization_layer(images), labels))
-
     # Data augmentation
     preprocessing_model = tf.keras.Sequential([normalization_layer])
     preprocessing_model.add(tf.keras.layers.RandomRotation(40))
@@ -188,7 +187,7 @@ def train_face_recognition_tf(training_dir='datasets_training', validation_dir='
     preprocessing_model.add(tf.keras.layers.RandomContrast(0.2))
     training_set = training_set.map(lambda images, labels: (
         preprocessing_model(images), labels)).repeat(num_augmented_images)
-
+    
     do_fine_tuning = True
     if model is None:
         model = tf.keras.Sequential([
@@ -330,6 +329,7 @@ def load_existing_model(model_name='models/saved_model.h5'):
 
 
 def get_img_score_tf(img_name, imres=(96,96), model=None):
+    warnings.filterwarnings("ignore")
     if model is None:
         model = load_existing_model()
     img = tf.keras.utils.load_img(
@@ -340,11 +340,11 @@ def get_img_score_tf(img_name, imres=(96,96), model=None):
     normalization_layer = tf.keras.layers.Rescaling(1. / 255)
     img_array = normalization_layer(img_array)
     image = img_array[0,:,:,:]
-    predictions = model.predict(img_array)
+    predictions = model.predict(img_array,verbose=0)
     return tf.nn.softmax(predictions[0])
 
 
-def classify_character_tf(character, class_names, imres=(96, 96), source_dir='datasets_anime', out_dir='datasets_recursive', model=None, best_only=False, a_thresh=.5):
+def classify_character_tf(character, class_names, imres=(96, 96), source_dir='datasets_anime', out_dir='datasets_recursive', model=None, best_only=False, ac_min=.1,ac_max=.6):
     img_files = files_in_dir(os.path.join(source_dir,character)) # get full filenames
     Nf = len(img_files)
     accuracy = np.zeros(Nf)
@@ -361,12 +361,11 @@ def classify_character_tf(character, class_names, imres=(96, 96), source_dir='da
                 for cidx in predicted_index: # Loop through top 5 most likely classes
                     if class_names[cidx] == character:
                         accuracy[fidx] = score[cidx]
-    print(accuracy)
     histogram, edges = np.histogram(accuracy)
     # finding a decent threshold by looking for local minima and choosing the rightmost one
     local_minima = find_peaks(np.negative(histogram))
     if local_minima[0].size != 0:
-        cutoff = max(a_thresh,edges[local_minima[0][-1]])
+        cutoff = min(ac_max,max(ac_min,edges[local_minima[0][-1]]))
         matches = np.flatnonzero(accuracy >= cutoff)
         # plt.stairs(histogram, edges, fill=True)
         # plt.show()
@@ -378,7 +377,7 @@ def classify_character_tf(character, class_names, imres=(96, 96), source_dir='da
     return 0
 
 
-def classify_all_characters_tf(in_dir='datasets_anime', out_dir='datasets_recursive', model_name='models/saved_model.h5', best_only=False, a_thresh=.5):
+def classify_all_characters_tf(in_dir='datasets_anime', out_dir='datasets_recursive', model_name='models/saved_model.h5', best_only=False, ac_max=.5,ac_min=.1):
     training_set = build_dataset(base_dir=in_dir)
     class_names = tuple(training_set.class_names)
     characters = sorted(os.listdir(in_dir))
@@ -387,11 +386,13 @@ def classify_all_characters_tf(in_dir='datasets_anime', out_dir='datasets_recurs
     model = load_existing_model(model_name)
     for idx,character in enumerate(characters):
         print(f'{idx+1}/{C}')
-        detection_rate = classify_character_tf(character, class_names,source_dir=in_dir,out_dir=out_dir,model=model,best_only=best_only,a_thresh=a_thresh)
+        detection_rate = classify_character_tf(character, class_names,source_dir=in_dir,out_dir=out_dir,model=model,best_only=best_only,ac_min=ac_min,ac_max=ac_max)
+        # Check for duplicates.
+        remove_duplicates(os.path.join(out_dir,character))
         overall_matches[idx] = detection_rate
         print(detection_rate)
-        print(overall_matches)
-        print(f'Overall detection rate: {np.mean(overall_matches)}')
+    print(overall_matches)
+    print(f'Overall detection rate: {np.mean(overall_matches)}')
 
 
 def classify_all_images_tf(in_dir='datasets_anime', out_dir='datasets_recursive', model_name='models/saved_model.h5', a_thresh=.5, imres=(96,96)):
@@ -427,6 +428,10 @@ def classify_all_images_tf(in_dir='datasets_anime', out_dir='datasets_recursive'
                     cidx = np.argmax(score)
                     print(f'{img_file} found to be member of {class_names[cidx]} with score {max(score)}.')
                     shutil.copy(img_file,os.path.join(out_dir,class_names[cidx],os.path.basename(img_file)))
+    for character in os.listdir(out_dir):
+        # Check for duplicates.
+        remove_duplicates(os.path.join(out_dir,character))
+
 
 
     
