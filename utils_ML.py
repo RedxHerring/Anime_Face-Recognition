@@ -20,10 +20,11 @@ import cv2
 import torch
 from torch import nn, optim
 from torch.utils.data import DataLoader
-import torchvision
-from torchvision import transforms
-from torchvision import datasets
+from torchvision import transforms, datasets, models
 from torchvision.models import efficientnet_v2_l
+from torch.utils.data import Dataset, DataLoader
+from torchvision.datasets import ImageFolder
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 
 def train_image_type(base_dir='datasetsTON',imres=(96,96),out_name='models/image_type_classifier_model.h5'):
@@ -322,6 +323,146 @@ def train_face_recognition_torch(recursive_dir='datasets_recursive', source_dir=
     torch.save(model.state_dict(), out_name)
     return model
 
+
+
+class OneShotDataset(Dataset):
+    def __init__(self, dataset, num_augmented_images, normalization_transform, augmentation_transform):
+        self.dataset = dataset
+        self.num_augmented_images = num_augmented_images
+        self.augmentation_transform = augmentation_transform
+        self.normalization_transform = normalization_transform
+
+    def __getitem__(self, index):
+        image, label = self.dataset[index]
+        augmented_images = []
+        augmented_labels = []
+        image_pil = transforms.ToPILImage()(image)  # Convert tensor to PIL Image
+        for _ in range(self.num_augmented_images):
+            augmented_image = self.augmentation_transform(image_pil)
+            augmented_images.append(self.normalization_transform(transforms.ToPILImage()(augmented_image)))
+            augmented_labels.append(label)
+        return self.normalization_transform(transforms.ToPILImage()(image)), torch.tensor(label), augmented_images, torch.tensor(augmented_labels)
+
+    def __len__(self):
+        return len(self.dataset)
+
+
+def train_face_recognition_1shot_torch(training_dir='datasets_training', validation_dir='datasets_anime', 
+                                      imres=(96, 96), num_augmented_images=100, out_name='models/saved_model.pt', 
+                                      reg=0.01, model=None):
+    batch_size = 16
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+    else:
+        try:
+            import intel_extension_for_pytorch as ipex
+            device = 'xpu'
+        except: 
+            device = "cpu"
+
+    create_missing_classes(training_dir=training_dir, validation_dir=validation_dir)
+    
+    transform = transforms.Compose([
+        transforms.Resize(imres),
+        transforms.RandomRotation(40),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomResizedCrop(imres, scale=(0.8, 1.2)),
+        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    ])
+
+    training_set = ImageFolder(training_dir, transform=transform)
+    class_names = training_set.classes
+
+    training_set = OneShotDataset(training_set, num_augmented_images, transform, transform)
+    training_loader = DataLoader(training_set, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True)
+
+    validation_set = ImageFolder(validation_dir, transform=transforms.Compose([
+        transforms.Resize(imres),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    ]))
+    validation_loader = DataLoader(validation_set, batch_size=batch_size, shuffle=False, num_workers=4, pin_memory=True)
+
+    if model is None:
+        model = models.resnet18(pretrained=True)
+        num_features = model.fc.in_features
+        model.fc = nn.Linear(num_features, len(class_names))
+    model.to(device)
+
+    if device == 'xpu':
+        model, optimizer = ipex.optimize(model, optimizer=optimizer)
+    
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9, weight_decay=reg)
+    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.2, patience=3, min_lr=0.00001)
+
+    num_epochs = 10
+    best_val_loss = float('inf')
+    early_stop_counter = 0
+
+    for epoch in range(num_epochs):
+        # Training
+        model.train()
+        train_loss = 0.0
+
+        for images, labels, augmented_images, augmented_labels in training_loader:
+            images, labels = images.to(device), labels.to(device)
+            augmented_images = [img.to(device) for img in augmented_images]
+            augmented_labels = [lbl.to(device) for lbl in augmented_labels]
+
+            optimizer.zero_grad()
+            outputs = model(torch.cat([images] + augmented_images, dim=0))
+            labels = torch.cat([labels] + augmented_labels, dim=0)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+
+            train_loss += loss.item() * images.size(0)
+
+        train_loss /= len(training_loader.dataset)
+
+        # Validation
+        model.eval()
+        val_loss = 0.0
+        correct = 0
+        total = 0
+
+        with torch.no_grad():
+            for images, labels in validation_loader:
+                images, labels = images.to(device), labels.to(device)
+
+                outputs = model(images)
+                loss = criterion(outputs, labels)
+                val_loss += loss.item() * images.size(0)
+
+                _, predicted = torch.max(outputs.data, 1)
+                total += labels.size(0)
+                correct += (predicted == labels).sum().item()
+
+        val_loss /= len(validation_loader.dataset)
+        val_acc = correct / total
+
+        scheduler.step(val_loss)
+
+        print(f'Epoch [{epoch+1}/{num_epochs}] - Train Loss: {train_loss:.4f} - Val Loss: {val_loss:.4f} - Val Acc: {val_acc:.4f}')
+
+        # Early stopping based on validation loss
+        if epoch > 4 and val_loss < best_val_loss:
+            early_stop_counter += 1
+            if early_stop_counter >= 3:
+                print('Early stopping triggered. Training stopped.')
+                break
+        else:
+            early_stop_counter = 0
+            best_val_loss = val_loss
+            torch.save(model.state_dict(), out_name)
+
+    model.load_state_dict(torch.load(out_name))
+    return model
+
+
 def load_existing_model(model_name='models/saved_model.h5'):
     model = tf.keras.models.load_model(model_name,
        custom_objects={'KerasLayer':hub.KerasLayer})
@@ -480,4 +621,5 @@ if __name__ == "__main__":
     # classify_image_type()
     # model, hist = train_face_recognition_tf()
     # model = load_existing_model()
-    classify_all_characters()
+    model = train_face_recognition_1shot_torch(training_dir='datasets_iterative0',validation_dir='datasets_anime',imres=(96,96),num_augmented_images=150,out_name='models/one_shot.pt')
+
