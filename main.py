@@ -39,6 +39,7 @@ if __name__ == "__main__":
     initialize_training_set(out_dir='Images/myanimelist-training')
     # Copy this one-image-per-class set to to first iteration training set.
     shutil.copytree('Images/myanimelist-training','datasets_iterative0',dirs_exist_ok=True)
+    '''
     # Train initial set, saving but not returning model so we don't have to run all of this at once
     train_face_recognition_tf(training_dir='datasets_iterative0',out_name='models/FRmodel0.h5',num_augmented_images=150)
     # Create next dataset using this model
@@ -58,7 +59,6 @@ if __name__ == "__main__":
     model = load_existing_model('models/FRmodel1.h5')
     # Train next set, saving but not returning model so we don't have to run all of this at once.
     train_face_recognition_tf(training_dir='datasets_iterative2',out_name='models/FRmodel2.h5',num_augmented_images=75,reg=1,model=model)
-    '''
     # Create next dataset using this model.
     shutil.copytree('Images/myanimelist-training','datasets_iterative3',dirs_exist_ok=True)
     # Get images from download images
