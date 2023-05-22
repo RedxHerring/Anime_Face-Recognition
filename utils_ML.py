@@ -10,6 +10,7 @@ import random
 import shutil
 import matplotlib.pyplot as plt
 from scipy.signal import find_peaks
+from skimage import exposure
 import shutil
 from tensorflow import keras
 from tensorflow.keras import layers
@@ -163,6 +164,11 @@ def build_dataset(base_dir='datasets_recursive', imres=(96, 96), subset='trainin
         image_size=imres,
         batch_size=1)
 
+def adaptive_histogram_equalization(image):
+    return exposure.equalize_adapthist(image)
+
+def gamma_correction(image, gamma=1.0):
+    return exposure.adjust_gamma(image, gamma)
 
 def train_face_recognition_tf(training_dir='datasets_training', validation_dir='datasets_anime', imres=(96, 96), num_augmented_images=100, out_name='models/saved_model.h5', 
                             batch_size=16, reg=.01, drprate=.7, num_epochs=5, lr=.001, model=None):
@@ -187,6 +193,8 @@ def train_face_recognition_tf(training_dir='datasets_training', validation_dir='
     preprocessing_model.add(tf.keras.layers.RandomTranslation(0, 0.2))
     preprocessing_model.add(tf.keras.layers.RandomTranslation(0.2, 0))
     preprocessing_model.add(tf.keras.layers.RandomZoom(0.2, 0.2))
+    preprocessing_model.add(tf.keras.layers.Lambda(adaptive_histogram_equalization))
+    preprocessing_model.add(tf.keras.layers.Lambda(lambda x: gamma_correction(x, gamma=1.5)))
     preprocessing_model.add(tf.keras.layers.RandomContrast(0.2))
     training_set = training_set.map(lambda images, labels: (
         preprocessing_model(images), labels)).repeat(num_augmented_images)
@@ -727,6 +735,10 @@ def get_img_scores_tf(img_name, imres=(96,96), model=None):
     normalization_layer = tf.keras.layers.Rescaling(1. / 255)
     img_array = normalization_layer(img_array)
     image = img_array[0,:,:,:]
+    # Apply filters
+    image = adaptive_histogram_equalization(image)
+    image = gamma_correction(image, gamma=1.0)
+    img_array = tf.expand_dims(image, 0)  # Create a batch
     predictions = model.predict(img_array,verbose=0)
     return tf.nn.softmax(predictions[0])
 
