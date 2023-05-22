@@ -386,21 +386,21 @@ def train_face_recognition_1shot_torch(training_dir='datasets_training', validat
     validation_loader = DataLoader(validation_set, batch_size=batch_size, shuffle=False, num_workers=4, pin_memory=True)
 
     if model is None:
-        model = models.densenet201(pretrained=True)
-        num_features = model.fc.in_features
+        model = models.densenet121(pretrained=True)
+        num_features = model.classifier.in_features
         model.classifier = nn.Sequential(
             nn.Dropout(0.5),
             nn.Linear(num_features, len(class_names))
         )
     model.to(device)
-
-    if device == 'xpu':
-        model, optimizer = ipex.optimize(model, optimizer=optimizer)
     
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9, weight_decay=reg)
     scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.2, patience=3, min_lr=0.00001)
 
+    if device == 'xpu':
+        model, optimizer = ipex.optimize(model, optimizer=optimizer)
+    
     num_epochs = 10
     best_val_loss = float('inf')
     early_stop_counter = 0
