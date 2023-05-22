@@ -2,7 +2,7 @@ import glob
 import os
 import shutil
 from utils import files_in_dir, initialize_training_set
-from utils_ML import train_image_type, classify_image_type, train_face_recognition_tf, classify_all_characters_tf, load_existing_model, classify_all_images_tf
+from utils_ML import train_image_type, classify_image_type, train_face_recognition_tf, classify_all_characters_tf, load_existing_model, classify_all_images_tf, augment_dataset
 
 def filter_dataset_by_imagetype(dataset_dir_in="datasets_base",dataset_dir_out="datasets_anime",rejected_dir_top="Images/rejected_images",model=None):
     '''
@@ -40,8 +40,10 @@ if __name__ == "__main__":
     # Copy this one-image-per-class set to to first iteration training set.
     shutil.copytree('Images/myanimelist-training','datasets_iterative0',dirs_exist_ok=True)
     '''
+
+    augment_dataset('datasets_iterative0','datasets_augmented0',150)
     # Train initial set, saving but not returning model so we don't have to run all of this at once
-    train_face_recognition_tf(training_dir='datasets_iterative0',out_name='models/FRmodel0.h5',num_augmented_images=150)
+    train_face_recognition_tf(training_dir='datasets_augmented0',out_name='models/FRmodel0.h5',num_augmented_images=1)
     # Create next dataset using this model
     shutil.copytree('Images/myanimelist-training','datasets_iterative1',dirs_exist_ok=True)
     # We set a value for a_thresh so that noisier class folders don't accidentally let images though just because they're on top of the mud pile.

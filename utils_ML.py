@@ -183,6 +183,63 @@ def gamma_correction_tf(image, gamma=1.0):
     return image
 
 
+def save_class_images_grid(training_set, class_index, output_path):
+    class_images = []
+    
+    # Collect images belonging to the specified class
+    for image, label in training_set:
+        if label == class_index:
+            class_images.append(image)
+
+    # Randomly select 36 images from the class
+    selected_images = np.random.choice(class_images, size=(6, 6), replace=False)
+
+    # Create the grid of images
+    fig, axes = plt.subplots(6, 6, figsize=(12, 12))
+
+    # Display the images in the grid
+    for i in range(6):
+        for j in range(6):
+            axes[i, j].imshow(selected_images[i, j])
+            axes[i, j].axis('off')
+
+    plt.tight_layout()
+
+    # Save the grid of images
+    plt.savefig(output_path)
+    plt.close()
+
+
+def augment_images(in_dir,out_dir, num_augmented_images=50, imres=(96,96)):
+    os.makedirs(out_dir,exist_ok=True)
+    # Data augmentation
+    preprocessing_model = tf.keras.Sequential([
+        tf.keras.layers.Rescaling(1. / 255),
+        tf.keras.layers.RandomRotation(15/180),
+        tf.keras.layers.RandomTranslation(0, 0.2),
+        tf.keras.layers.RandomTranslation(0.2, 0),
+        tf.keras.layers.RandomZoom(0.2, 0.2),
+        tf.keras.layers.RandomContrast(0.2),
+        tf.keras.layers.RandomFlip(mode='horizontal')])
+    # Get image files
+    image_files = files_in_dir(in_dir)
+    num_digits = int(np.ceil(np.log10(num_augmented_images)))
+    for imgf in image_files:
+        img = tf.keras.utils.load_img(
+            imgf, target_size=imres
+        )
+        img_array = tf.keras.utils.img_to_array(img)
+        img_array = tf.expand_dims(img_array, 0) # Create a batch
+        fullname, ext = os.path.splitext(imgf)
+        for idx in range(num_augmented_images):
+            augmented_image = preprocessing_model(img_array)
+            idxstr = str(idx)
+            idxstr = '0'*(num_digits-len(idxstr)) + idxstr
+            img = np.array(augmented_image[0])
+            img = img / np.max(img)
+            plt.imsave(os.path.join(out_dir,os.path.basename(fullname)+idxstr+ext),img)
+
+
 def train_face_recognition_tf(training_dir='datasets_training', validation_dir='datasets_anime', imres=(96, 96), num_augmented_images=100, out_name='models/saved_model.h5', 
                             batch_size=16, reg=.01, drprate=.7, num_epochs=5, lr=.001, model=None):
     warnings.filterwarnings("ignore")
@@ -211,7 +268,8 @@ def train_face_recognition_tf(training_dir='datasets_training', validation_dir='
     preprocessing_model.add(tf.keras.layers.RandomContrast(0.2))
     training_set = training_set.map(lambda images, labels: (
         preprocessing_model(images), labels)).repeat(num_augmented_images)
-    
+    save_class_images_grid(training_set,2,'augmented_images.png')
+
     do_fine_tuning = True
     if model is None:
         model = tf.keras.Sequential([
@@ -730,6 +788,12 @@ def train_face_recognition_1shot_torch(training_dir='datasets_training', validat
     return model
 
 
+def augment_dataset(in_dir='dataset_base',out_dir='dataset_augmented',num_augmented=25):
+    class_dirs = os.listdir(in_dir)
+    for dir in class_dirs:
+        augment_images(os.path.join(in_dir,dir),os.path.join(out_dir,dir),num_augmented_images=num_augmented)
+
+
 def load_existing_model(model_name='models/saved_model.h5'):
     model = tf.keras.models.load_model(model_name,
        custom_objects={'KerasLayer':hub.KerasLayer})
@@ -743,15 +807,12 @@ def get_img_scores_tf(img_name, imres=(96,96), model=None):
     img = tf.keras.utils.load_img(
         img_name , target_size=imres
     )
+    img = img/np.max(img)
     img_array = tf.keras.utils.img_to_array(img)
     img_array = tf.expand_dims(img_array, 0) # Create a batch
     normalization_layer = tf.keras.layers.Rescaling(1. / 255)
     img_array = normalization_layer(img_array)
     image = img_array[0,:,:,:]
-    # Apply filters
-    image = adaptive_histogram_equalization(image)
-    image = gamma_correction(image, gamma=1.0)
-    img_array = tf.expand_dims(image, 0)  # Create a batch
     predictions = model.predict(img_array,verbose=0)
     return tf.nn.softmax(predictions[0])
 
@@ -892,5 +953,7 @@ if __name__ == "__main__":
     # classify_image_type()
     # model, hist = train_face_recognition_tf()
     # model = load_existing_model()
-    model = train_face_recognition_1shot_torch(training_dir='datasets_iterative0',validation_dir='datasets_anime',imres=(96,96),num_augmented_images=150,out_name='models/one_shot.pt')
+    # augment_images('datasets_iterative0/Kenzou_Tenma','augmented_images',150)
+    classify_all_characters_tf('datasets_anime','datasets_iterative1',model_name='models/FRmodel2.h5',ac_min=.15,ac_max=.2)
+    # model = train_face_recognition_1shot_torch(training_dir='datasets_iterative0',validation_dir='datasets_anime',imres=(96,96),num_augmented_images=150,out_name='models/one_shot.pt')
 
