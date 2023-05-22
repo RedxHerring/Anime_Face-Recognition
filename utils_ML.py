@@ -386,9 +386,12 @@ def train_face_recognition_1shot_torch(training_dir='datasets_training', validat
     validation_loader = DataLoader(validation_set, batch_size=batch_size, shuffle=False, num_workers=4, pin_memory=True)
 
     if model is None:
-        model = models.resnet18(pretrained=True)
+        model = models.densenet201(pretrained=True)
         num_features = model.fc.in_features
-        model.fc = nn.Linear(num_features, len(class_names))
+        model.classifier = nn.Sequential(
+            nn.Dropout(0.5),
+            nn.Linear(num_features, len(class_names))
+        )
     model.to(device)
 
     if device == 'xpu':
