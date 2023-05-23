@@ -47,11 +47,12 @@ if __name__ == "__main__":
     shutil.copytree('Images/myanimelist-training','datasets_iterative1',dirs_exist_ok=True)
     # We set a value for a_thresh so that noisier class folders don't accidentally let images though just because they're on top of the mud pile.
     classify_all_characters_tf('datasets_anime','datasets_iterative1',model_name='models/FRmodel0.h5',ac_min=.15,ac_max=.2)
-    '''
+
     augment_dataset('datasets_iterative1','datasets_augmented1',200,tvsplit=.1)
     # Train next set, reloading last model to save time
     model = load_existing_model('models/FRmodel0.h5')
     train_face_recognition_tf(training_dir='datasets_augmented1',out_name='models/FRmodel1.h5',reg=.1,model=model)
+    '''
     # Create next dataset using this model
     shutil.copytree('Images/myanimelist-training','datasets_iterative2',dirs_exist_ok=True)
     # We set best_only to true so that if a character is similar but in the wrong set, it will be passed over as long as its true class is more likely.
