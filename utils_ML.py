@@ -210,7 +210,11 @@ def save_class_images_grid(training_set, class_index, output_path):
     plt.close()
 
 
-def augment_images(in_dir,out_dir, num_augmented_images=50, imres=(96,96)):
+def augment_images(in_dir,out_dir, total_augmented_images=50, imres=(96,96),tvsplit=.2):
+    out_dir_top = os.path.dirname(out_dir)
+    class_name = os.path.basename(out_dir)
+    train_dir = os.path.join(out_dir_top,'train',class_name)
+    val_dir = os.path.join(out_dir_top,'val',class_name)
     os.makedirs(out_dir,exist_ok=True)
     # Data augmentation
     preprocessing_model = tf.keras.Sequential([
@@ -223,7 +227,10 @@ def augment_images(in_dir,out_dir, num_augmented_images=50, imres=(96,96)):
         tf.keras.layers.RandomFlip(mode='horizontal')])
     # Get image files
     image_files = files_in_dir(in_dir)
-    num_digits = int(np.ceil(np.log10(num_augmented_images)))
+    augmentations_per_image = int(np.ceil(total_augmented_images/len(image_files)))
+    total_augmented_images = augmentations_per_image * len(image_files)
+    idxsplit = int(total_augmented_images*tvsplit)
+    num_digits = int(np.ceil(np.log10(total_augmented_images)))
     for imgf in image_files:
         img = tf.keras.utils.load_img(
             imgf, target_size=imres
@@ -231,44 +238,37 @@ def augment_images(in_dir,out_dir, num_augmented_images=50, imres=(96,96)):
         img_array = tf.keras.utils.img_to_array(img)
         img_array = tf.expand_dims(img_array, 0) # Create a batch
         fullname, ext = os.path.splitext(imgf)
-        for idx in range(num_augmented_images):
+        for idx in range(augmentations_per_image):
             augmented_image = preprocessing_model(img_array)
             idxstr = str(idx)
             idxstr = '0'*(num_digits-len(idxstr)) + idxstr
             img = np.array(augmented_image[0])
             img = img / np.max(img)
-            plt.imsave(os.path.join(out_dir,os.path.basename(fullname)+idxstr+ext),img)
+            if idx >= idxsplit:
+                plt.imsave(os.path.join(train_dir,os.path.basename(fullname)+idxstr+ext),img)
+            else:
+                plt.imsave(os.path.join(val_dir,os.path.basename(fullname)+idxstr+ext),img)
 
 
-def train_face_recognition_tf(training_dir='datasets_training', validation_dir='datasets_anime', imres=(96, 96), num_augmented_images=100, out_name='models/saved_model.h5', 
+def train_face_recognition_tf(training_dir='datasets_training', validation_dir='datasets_anime', imres=(96, 96), out_name='models/saved_model.h5', 
                             batch_size=16, reg=.01, drprate=.7, num_epochs=5, lr=.001, model=None):
     warnings.filterwarnings("ignore")
     checkpoint_path = "checkpt"
     create_missing_classes(training_dir=training_dir, validation_dir=validation_dir)
 
     # Prepare training and validation datasets
+    normalization_layer = tf.keras.layers.Rescaling(1. / 255)
+
     training_set = build_dataset(training_dir, imres, "training")
     class_names = tuple(training_set.class_names)
     training_size = training_set.cardinality().numpy()
     training_set = training_set.unbatch().repeat().batch(batch_size)
-
-    normalization_layer = tf.keras.layers.Rescaling(1. / 255)
+    training_set = training_set.map(lambda images, labels: (normalization_layer(images), labels))
+    
     validation_set = build_dataset(validation_dir, subset='validation')
     validation_size = validation_set.cardinality().numpy()
     validation_set = validation_set.unbatch().batch(batch_size)
     validation_set = validation_set.map(lambda images, labels: (normalization_layer(images), labels))
-    # Data augmentation
-    preprocessing_model = tf.keras.Sequential([normalization_layer])
-    preprocessing_model.add(tf.keras.layers.RandomRotation(40))
-    preprocessing_model.add(tf.keras.layers.RandomTranslation(0, 0.2))
-    preprocessing_model.add(tf.keras.layers.RandomTranslation(0.2, 0))
-    preprocessing_model.add(tf.keras.layers.RandomZoom(0.2, 0.2))
-    preprocessing_model.add(tf.keras.layers.Lambda(adaptive_histogram_equalization_tf))
-    preprocessing_model.add(tf.keras.layers.Lambda(lambda x: gamma_correction_tf(x, gamma=1.5)))
-    preprocessing_model.add(tf.keras.layers.RandomContrast(0.2))
-    training_set = training_set.map(lambda images, labels: (
-        preprocessing_model(images), labels)).repeat(num_augmented_images)
-    save_class_images_grid(training_set,2,'augmented_images.png')
 
     do_fine_tuning = True
     if model is None:
@@ -299,7 +299,7 @@ def train_face_recognition_tf(training_dir='datasets_training', validation_dir='
         save_best_only=True,
         save_weights_only=True,
     )
-    steps_per_epoch = (training_size * num_augmented_images) // batch_size
+    steps_per_epoch = training_size // batch_size
     validation_steps = validation_size // batch_size
 
     hist = model.fit(
@@ -412,19 +412,19 @@ def set_parameter_requires_grad(model, feature_extracting):
             param.requires_grad = False
 
 
-def initialize_model(model_name, num_classes, feature_extract, use_pretrained=True, in_size=96):
+def initialize_model(model_name, num_classes, feature_extract, use_pretrained=True):
     # Initialize these variables which will be set in this if statement. Each of these
     #   variables is model specific.
     model_ft = None
 
     if model_name == "resnet":
-        """ Resnet18
+        """ Resnet101
         """
-        model_ft = models.resnet18(pretrained=use_pretrained)
+        model_ft = models.resnet101(pretrained=use_pretrained)
         set_parameter_requires_grad(model_ft, feature_extract)
         num_ftrs = model_ft.fc.in_features
         model_ft.fc = nn.Linear(num_ftrs, num_classes)
-        input_size = in_size
+        input_size = 224
 
     elif model_name == "alexnet":
         """ Alexnet
@@ -433,7 +433,7 @@ def initialize_model(model_name, num_classes, feature_extract, use_pretrained=Tr
         set_parameter_requires_grad(model_ft, feature_extract)
         num_ftrs = model_ft.classifier[6].in_features
         model_ft.classifier[6] = nn.Linear(num_ftrs,num_classes)
-        input_size = in_size
+        input_size = 224
 
     elif model_name == "vgg":
         """ VGG11_bn
@@ -442,7 +442,7 @@ def initialize_model(model_name, num_classes, feature_extract, use_pretrained=Tr
         set_parameter_requires_grad(model_ft, feature_extract)
         num_ftrs = model_ft.classifier[6].in_features
         model_ft.classifier[6] = nn.Linear(num_ftrs,num_classes)
-        input_size = in_size
+        input_size = 224
 
     elif model_name == "squeezenet":
         """ Squeezenet
@@ -451,7 +451,7 @@ def initialize_model(model_name, num_classes, feature_extract, use_pretrained=Tr
         set_parameter_requires_grad(model_ft, feature_extract)
         model_ft.classifier[1] = nn.Conv2d(512, num_classes, kernel_size=(1,1), stride=(1,1))
         model_ft.num_classes = num_classes
-        input_size = in_size
+        input_size = 224
 
     elif model_name == "densenet":
         """ Densenet
@@ -460,7 +460,7 @@ def initialize_model(model_name, num_classes, feature_extract, use_pretrained=Tr
         set_parameter_requires_grad(model_ft, feature_extract)
         num_ftrs = model_ft.classifier.in_features
         model_ft.classifier = nn.Linear(num_ftrs, num_classes)
-        input_size = in_size
+        input_size = 224
 
     elif model_name == "inception":
         """ Inception v3
@@ -474,7 +474,7 @@ def initialize_model(model_name, num_classes, feature_extract, use_pretrained=Tr
         # Handle the primary net
         num_ftrs = model_ft.fc.in_features
         model_ft.fc = nn.Linear(num_ftrs,num_classes)
-        input_size = in_size
+        input_size = 299
 
     else:
         print("Invalid model name, exiting...")
@@ -483,91 +483,148 @@ def initialize_model(model_name, num_classes, feature_extract, use_pretrained=Tr
     return model_ft, input_size
 
 
-def train_model(model, dataloaders, criterion, optimizer, device='cpu', num_epochs=25, is_inception=False):
+def train_model(model, dataloaders, criterion, optimizer, num_epochs=25, is_inception=False, device='cpu'):
     since = time.time()
-
     val_acc_history = []
-
     best_model_wts = copy.deepcopy(model.state_dict())
     best_acc = 0.0
-
     for epoch in range(num_epochs):
         print('Epoch {}/{}'.format(epoch, num_epochs - 1))
         print('-' * 10)
-
         # Each epoch has a training and validation phase
         for phase in ['train', 'val']:
-            running_loss = 0.0
-            running_corrects = 0
-
             if phase == 'train':
                 model.train()  # Set model to training mode
-                # Iterate over data.
-                for images, labels, augmented_images, augmented_labels in dataloaders[phase]:
-                    images, labels = images.to(device), labels.to(device)
-                    augmented_images = [img.to(device) for img in augmented_images]
-                    augmented_labels = [lbl.to(device) for lbl in augmented_labels]
-                    optimizer.zero_grad()
-                    
-                    labels = torch.cat([labels] + augmented_labels, dim=0)
-                    # forward
-                    # track history if only in train
-                    with torch.set_grad_enabled(phase == 'train'):
-                        # Get model outputs and calculate loss
-                        # Special case for inception because in training it has an auxiliary output. In train
-                        #   mode we calculate the loss by summing the final output and the auxiliary output
-                        #   but in testing we only consider the final output.
-                        if is_inception and phase == 'train':
-                            # From https://discuss.pytorch.org/t/how-to-optimize-inception-model-with-auxiliary-classifiers/7958
-                            outputs, aux_outputs = model(torch.cat([images] + augmented_images, dim=0))
-                            loss1 = criterion(outputs, labels)
-                            loss2 = criterion(aux_outputs, labels)
-                            loss = loss1 + 0.4*loss2
-                        else:
-                            outputs = model(torch.cat([images] + augmented_images, dim=0))
-                            loss = criterion(outputs, labels)
-                        _, preds = torch.max(outputs, 1)
-                        loss.backward()
-                        optimizer.step()
-                    # statistics
-                    running_loss += loss.item() * inputs.size(0)
-                    running_corrects += torch.sum(preds == labels.data)
             else:
                 model.eval()   # Set model to evaluate mode
-                # Iterate over data.
-                for inputs, labels in dataloaders[phase]:
-                    inputs = inputs.to(device)
-                    labels = labels.to(device)
-                    # zero the parameter gradients
-                    optimizer.zero_grad()
-                    # track history if only in train
-                    with torch.set_grad_enabled(phase == 'train'):
+            running_loss = 0.0
+            running_corrects = 0
+            # Iterate over data.
+            for inputs, labels in dataloaders[phase]:
+                inputs = inputs.to(device)
+                labels = labels.to(device)
+                # zero the parameter gradients
+                optimizer.zero_grad()
+                # forward
+                # track history if only in train
+                with torch.set_grad_enabled(phase == 'train'):
+                    # Get model outputs and calculate loss
+                    # Special case for inception because in training it has an auxiliary output. In train
+                    #   mode we calculate the loss by summing the final output and the auxiliary output
+                    #   but in testing we only consider the final output.
+                    if is_inception and phase == 'train':
+                        # From https://discuss.pytorch.org/t/how-to-optimize-inception-model-with-auxiliary-classifiers/7958
+                        outputs, aux_outputs = model(inputs)
+                        loss1 = criterion(outputs, labels)
+                        loss2 = criterion(aux_outputs, labels)
+                        loss = loss1 + 0.4*loss2
+                    else:
                         outputs = model(inputs)
                         loss = criterion(outputs, labels)
-                        _, preds = torch.max(outputs, 1)
-                    # statistics
-                    running_loss += loss.item() * inputs.size(0)
-                    running_corrects += torch.sum(preds == labels.data)
+                    _, preds = torch.max(outputs, 1)
+                    # backward + optimize only if in training phase
+                    if phase == 'train':
+                        loss.backward()
+                        optimizer.step()
+                # statistics
+                running_loss += loss.item() * inputs.size(0)
+                running_corrects += torch.sum(preds == labels.data)
             epoch_loss = running_loss / len(dataloaders[phase].dataset)
-            epoch_acc = running_corrects.double() / len(dataloaders[phase].dataset)
-            print('{} Loss: {:.4f} Acc: {:.4f}'.format(phase, epoch_loss, epoch_acc))
-
+            epoch_acc = running_corrects / len(dataloaders[phase].dataset)
+            print(f'{phase} - Loss: {epoch_loss}, Acc: {running_corrects}/{len(dataloaders[phase].dataset)}')
             # deep copy the model
             if phase == 'val' and epoch_acc > best_acc:
                 best_acc = epoch_acc
                 best_model_wts = copy.deepcopy(model.state_dict())
             if phase == 'val':
                 val_acc_history.append(epoch_acc)
-
         print()
-
     time_elapsed = time.time() - since
     print('Training complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
     print('Best val Acc: {:4f}'.format(best_acc))
-
     # load best model weights
     model.load_state_dict(best_model_wts)
     return model, val_acc_history
+
+
+def run_finetune_model_torch(train_dir='datasets_iterative0',val_dir='datasets_anime',model_name="resnet",out_name="models/saved_model.pt"):
+    # Models to choose from [resnet, alexnet, vgg, squeezenet, densenet, inception]
+    # Number of classes in the dataset
+    num_classes = len(os.listdir(train_dir))
+    # Batch size for training (change depending on how much memory you have)
+    batch_size = 8
+    # Number of epochs to train for
+    num_epochs = 15
+    # Flag for feature extracting. When False, we finetune the whole model,
+    #   when True we only update the reshaped layer params
+    feature_extract = True
+    # Initialize the model for this run
+    model_ft, input_size = initialize_model(model_name, num_classes, feature_extract, use_pretrained=True)
+    # Print the model we just instantiated
+    print(model_ft)
+    # Data augmentation and normalization for training
+    # Just normalization for validation
+    data_transforms = {
+        'train': transforms.Compose([
+            transforms.RandomResizedCrop(input_size),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        ]),
+        'val': transforms.Compose([
+            transforms.Resize(input_size),
+            transforms.CenterCrop(input_size),
+            transforms.ToTensor(),
+            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        ]),
+    }
+    print("Initializing Datasets and Dataloaders...")
+    # Create training and validation datasets
+    image_datasets = {'train': datasets.ImageFolder(train_dir, data_transforms['train']),
+                        'val': datasets.ImageFolder(val_dir, data_transforms['val'])}
+    # Create training and validation dataloaders
+    dataloaders_dict = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=batch_size, shuffle=True, num_workers=4) for x in ['train', 'val']}
+    # Detect if we have a GPU available
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+    else:
+        try:
+            import intel_extension_for_pytorch as ipex
+            device = 'xpu'
+        except: 
+            device = "cpu"
+    # Send the model to GPU
+    model_ft = model_ft.to(device)
+    # Gather the parameters to be optimized/updated in this run. If we are
+    #  finetuning we will be updating all parameters. However, if we are
+    #  doing feature extract method, we will only update the parameters
+    #  that we have just initialized, i.e. the parameters with requires_grad
+    #  is True.
+    params_to_update = model_ft.parameters()
+    print("Params to learn:")
+    if feature_extract:
+        params_to_update = []
+        for name,param in model_ft.named_parameters():
+            if param.requires_grad == True:
+                params_to_update.append(param)
+                print("\t",name)
+    else:
+        for name,param in model_ft.named_parameters():
+            if param.requires_grad == True:
+                print("\t",name)
+    # Observe that all parameters are being optimized
+    optimizer_ft = optim.SGD(params_to_update, lr=0.001, momentum=0.9)
+    # Setup the loss fxn
+    criterion = nn.CrossEntropyLoss()
+    # Train and evaluate
+    model_ft, hist = train_model(model_ft, dataloaders_dict, criterion, optimizer_ft, num_epochs=num_epochs, is_inception=(model_name=="inception"),device=device)
+    torch.save(model_ft.state_dict(), out_name)
+    return model_ft
+
+
+def get_image_scores_torch(model=None, model_path="models/saved_model.pt"):
+    if model is None:
+        model = torch.load(model_path)
 
 
 class OneShotDataset(Dataset):
@@ -665,7 +722,6 @@ def run_face_recognition_1shot_torch(training_dir='datasets_training', validatio
 
     model.load_state_dict(torch.load(out_name))
     return model
-
 
 
 def train_face_recognition_1shot_torch(training_dir='datasets_training', validation_dir='datasets_anime', 
@@ -791,7 +847,7 @@ def train_face_recognition_1shot_torch(training_dir='datasets_training', validat
 def augment_dataset(in_dir='dataset_base',out_dir='dataset_augmented',num_augmented=25):
     class_dirs = os.listdir(in_dir)
     for dir in class_dirs:
-        augment_images(os.path.join(in_dir,dir),os.path.join(out_dir,dir),num_augmented_images=num_augmented)
+        augment_images(os.path.join(in_dir,dir),os.path.join(out_dir,dir),total_augmented_images=num_augmented)
 
 
 def load_existing_model(model_name='models/saved_model.h5'):
@@ -807,7 +863,6 @@ def get_img_scores_tf(img_name, imres=(96,96), model=None):
     img = tf.keras.utils.load_img(
         img_name , target_size=imres
     )
-    img = img/np.max(img)
     img_array = tf.keras.utils.img_to_array(img)
     img_array = tf.expand_dims(img_array, 0) # Create a batch
     normalization_layer = tf.keras.layers.Rescaling(1. / 255)
@@ -954,6 +1009,7 @@ if __name__ == "__main__":
     # model, hist = train_face_recognition_tf()
     # model = load_existing_model()
     # augment_images('datasets_iterative0/Kenzou_Tenma','augmented_images',150)
-    classify_all_characters_tf('datasets_anime','datasets_iterative1',model_name='models/FRmodel2.h5',ac_min=.15,ac_max=.2)
+    # classify_all_characters_tf('datasets_anime','datasets_iterative1',model_name='models/FRmodel2.h5',ac_min=.15,ac_max=.2)
+    run_finetune_model_torch(train_dir='datasets_augmented0',val_dir='datasets_anime',model_name="resnet",out_name="models/FRmodel0.pt")
     # model = train_face_recognition_1shot_torch(training_dir='datasets_iterative0',validation_dir='datasets_anime',imres=(96,96),num_augmented_images=150,out_name='models/one_shot.pt')
 

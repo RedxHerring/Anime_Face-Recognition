@@ -16,3 +16,14 @@ Epoch 5/10
 Epoch 6/10
  584/1120 [==============>...............] - ETA: 5:41 - loss: 2.3215 - accuracy: 0.9102 - top-5-accuracy: 0.9933 
  
+
+
+968/968 [==============================] - 693s 683ms/step - loss: 7.7089 - accuracy: 0.0459 - top-5-accuracy: 0.1284 - val_loss: 7.4746 - val_accuracy: 0.0174 - val_top-5-accuracy: 0.0561 - lr: 0.0010
+Epoch 2/5
+968/968 [==============================] - 656s 678ms/step - loss: 6.1613 - accuracy: 0.3688 - top-5-accuracy: 0.6077 - val_loss: 7.0364 - val_accuracy: 0.0400 - val_top-5-accuracy: 0.0995 - lr: 0.0010
+Epoch 3/5
+968/968 [==============================] - 659s 681ms/step - loss: 4.4418 - accuracy: 0.7954 - top-5-accuracy: 0.9416 - val_loss: 6.9303 - val_accuracy: 0.0512 - val_top-5-accuracy: 0.1110 - lr: 0.0010
+Epoch 4/5
+968/968 [==============================] - 657s 679ms/step - loss: 3.3152 - accuracy: 0.9533 - top-5-accuracy: 0.9938 - val_loss: 6.8872 - val_accuracy: 0.0587 - val_top-5-accuracy: 0.1205 - lr: 0.0010
+Epoch 5/5
+968/968 [==============================] - 657s 679ms/step - loss: 2.8251 - accuracy: 0.9822 - top-5-accuracy: 0.9983 - val_loss: 6.7913 - val_accuracy: 0.0597 - val_top-5-accuracy: 0.1229 - lr: 0.0010
