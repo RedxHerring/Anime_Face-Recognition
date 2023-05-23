@@ -846,7 +846,7 @@ def train_face_recognition_1shot_torch(training_dir='datasets_training', validat
 
 
 def augment_dataset(in_dir='dataset_base',out_dir='dataset_augmented',num_augmented=100,tvsplit=.1):
-    class_dirs = os.listdir(in_dir)
+    class_dirs = sorted(os.listdir(in_dir))
     for dir in class_dirs:
         augment_images(os.path.join(in_dir,dir),os.path.join(out_dir,dir),total_augmented_images=num_augmented,tvsplit=tvsplit)
 
