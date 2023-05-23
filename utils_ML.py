@@ -844,10 +844,10 @@ def train_face_recognition_1shot_torch(training_dir='datasets_training', validat
     return model
 
 
-def augment_dataset(in_dir='dataset_base',out_dir='dataset_augmented',num_augmented=25):
+def augment_dataset(in_dir='dataset_base',out_dir='dataset_augmented',num_augmented=100,tvsplit=.1):
     class_dirs = os.listdir(in_dir)
     for dir in class_dirs:
-        augment_images(os.path.join(in_dir,dir),os.path.join(out_dir,dir),total_augmented_images=num_augmented)
+        augment_images(os.path.join(in_dir,dir),os.path.join(out_dir,dir),total_augmented_images=num_augmented,tvsplit=tvsplit)
 
 
 def load_existing_model(model_name='models/saved_model.h5'):
@@ -1010,6 +1010,7 @@ if __name__ == "__main__":
     # model = load_existing_model()
     # augment_images('datasets_iterative0/Kenzou_Tenma','augmented_images',150)
     # classify_all_characters_tf('datasets_anime','datasets_iterative1',model_name='models/FRmodel2.h5',ac_min=.15,ac_max=.2)
-    run_finetune_model_torch(train_dir='datasets_augmented0',val_dir='datasets_anime',model_name="resnet",out_name="models/FRmodel0.pt")
+    augment_dataset('datasets_iterative1','datasets_augmented1tv',200,tvsplit=.1)
+    # run_finetune_model_torch(train_dir='datasets_augmented1tv/train',val_dir='datasets_augmented1tv/val',model_name="resnet",out_name="models/FRmodel1.pt")
     # model = train_face_recognition_1shot_torch(training_dir='datasets_iterative0',validation_dir='datasets_anime',imres=(96,96),num_augmented_images=150,out_name='models/one_shot.pt')
 
