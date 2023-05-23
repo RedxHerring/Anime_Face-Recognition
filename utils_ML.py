@@ -215,7 +215,8 @@ def augment_images(in_dir,out_dir, total_augmented_images=50, imres=(96,96),tvsp
     class_name = os.path.basename(out_dir)
     train_dir = os.path.join(out_dir_top,'train',class_name)
     val_dir = os.path.join(out_dir_top,'val',class_name)
-    os.makedirs(out_dir,exist_ok=True)
+    os.makedirs(train_dir,exist_ok=True)
+    os.makedirs(val_dir,exist_ok=True)
     # Data augmentation
     preprocessing_model = tf.keras.Sequential([
         tf.keras.layers.Rescaling(1. / 255),
@@ -229,7 +230,7 @@ def augment_images(in_dir,out_dir, total_augmented_images=50, imres=(96,96),tvsp
     image_files = files_in_dir(in_dir)
     augmentations_per_image = int(np.ceil(total_augmented_images/len(image_files)))
     total_augmented_images = augmentations_per_image * len(image_files)
-    idxsplit = int(total_augmented_images*tvsplit)
+    print(f'Augmenting {int((1-tvsplit)*total_augmented_images)} images into training and {int(tvsplit*total_augmented_images)} images into validation for {class_name}.')
     num_digits = int(np.ceil(np.log10(total_augmented_images)))
     for imgf in image_files:
         img = tf.keras.utils.load_img(
@@ -244,7 +245,7 @@ def augment_images(in_dir,out_dir, total_augmented_images=50, imres=(96,96),tvsp
             idxstr = '0'*(num_digits-len(idxstr)) + idxstr
             img = np.array(augmented_image[0])
             img = img / np.max(img)
-            if idx >= idxsplit:
+            if np.random.rand()>tvsplit:
                 plt.imsave(os.path.join(train_dir,os.path.basename(fullname)+idxstr+ext),img)
             else:
                 plt.imsave(os.path.join(val_dir,os.path.basename(fullname)+idxstr+ext),img)
