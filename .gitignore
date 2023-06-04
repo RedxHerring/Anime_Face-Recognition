@@ -21,7 +21,7 @@ webdriver/*.zip
 photos
 .ipynb_checkpoints/juypter_main-checkpoint.ipynb
 webdriver/chromedriver.exe
-checkpoint*
+*.pth
 checkpt*
 models/*.h5
 models/*.pt

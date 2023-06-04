@@ -1,4 +1,3 @@
-import tensorflow as tf
 import tensorflow_hub as hub
 import numpy as np
 import glob
@@ -12,10 +11,6 @@ import matplotlib.pyplot as plt
 from scipy.signal import find_peaks
 from skimage import exposure
 import shutil
-from tensorflow import keras
-from tensorflow.keras import layers
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
-from tensorflow.keras.preprocessing.image import load_img, img_to_array
 
 from utils import files_in_dir, remove_duplicates
 
@@ -165,90 +160,62 @@ def build_dataset(base_dir='datasets_recursive', imres=(96, 96), subset='trainin
         batch_size=1)
 
 
-def adaptive_histogram_equalization(image):
-    return exposure.equalize_adapthist(image)
+class AugmentedDataset(Dataset):
+    def __init__(self, dataset, total_augmented_images, transform):
+        self.dataset = dataset
+        self.total_augmented_images = total_augmented_images
+        self.transform = transform
+
+    def __len__(self):
+        return self.total_augmented_images
+
+    def __getitem__(self, index):
+        image, label = self.dataset[index % len(self.dataset)]
+        image = self.transform(image)
+        return image, label
 
 
-def adaptive_histogram_equalization_tf(image):
-    image = tf.image.adjust_contrast(image, 2.0)  # Increase contrast
-    return image
-
-
-def gamma_correction(image, gamma=1.0):
-    return exposure.adjust_gamma(image, gamma)
-
-
-def gamma_correction_tf(image, gamma=1.0):
-    image = tf.image.adjust_gamma(image, gamma=gamma)
-    return image
-
-
-def save_class_images_grid(training_set, class_index, output_path):
-    class_images = []
-    
-    # Collect images belonging to the specified class
-    for image, label in training_set:
-        if label == class_index:
-            class_images.append(image)
-
-    # Randomly select 36 images from the class
-    selected_images = np.random.choice(class_images, size=(6, 6), replace=False)
-
-    # Create the grid of images
-    fig, axes = plt.subplots(6, 6, figsize=(12, 12))
-
-    # Display the images in the grid
-    for i in range(6):
-        for j in range(6):
-            axes[i, j].imshow(selected_images[i, j])
-            axes[i, j].axis('off')
-
-    plt.tight_layout()
-
-    # Save the grid of images
-    plt.savefig(output_path)
-    plt.close()
-
-
-def augment_images(in_dir,out_dir, total_augmented_images=50, imres=(96,96),tvsplit=.2):
+def augment_images(in_dir, out_dir, total_augmented_images=50, imres=(96, 96), tvsplit=0.2):
     out_dir_top = os.path.dirname(out_dir)
     class_name = os.path.basename(out_dir)
-    train_dir = os.path.join(out_dir_top,'train',class_name)
-    val_dir = os.path.join(out_dir_top,'val',class_name)
-    os.makedirs(train_dir,exist_ok=True)
-    os.makedirs(val_dir,exist_ok=True)
+    train_dir = os.path.join(out_dir_top, 'train', class_name)
+    val_dir = os.path.join(out_dir_top, 'val', class_name)
+    os.makedirs(train_dir, exist_ok=True)
+    os.makedirs(val_dir, exist_ok=True)
+
     # Data augmentation
-    preprocessing_model = tf.keras.Sequential([
-        tf.keras.layers.Rescaling(1. / 255),
-        tf.keras.layers.RandomRotation(15/180),
-        tf.keras.layers.RandomTranslation(0, 0.2),
-        tf.keras.layers.RandomTranslation(0.2, 0),
-        tf.keras.layers.RandomZoom(0.2, 0.2),
-        tf.keras.layers.RandomContrast(0.2),
-        tf.keras.layers.RandomFlip(mode='horizontal')])
+    transform = transforms.Compose([
+        transforms.RandomRotation(15),
+        transforms.RandomAffine(degrees=0, translate=(0, 0.2), shear=0.2),
+        transforms.RandomResizedCrop(imres, scale=(0.8, 1.2)),
+        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2),
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    ])
+
     # Get image files
-    image_files = files_in_dir(in_dir)
-    augmentations_per_image = int(np.ceil(total_augmented_images/len(image_files)))
+    image_files = [os.path.join(in_dir, f) for f in os.listdir(in_dir) if os.path.isfile(os.path.join(in_dir, f))]
+    augmentations_per_image = int(np.ceil(total_augmented_images / len(image_files)))
     total_augmented_images = augmentations_per_image * len(image_files)
-    print(f'Augmenting {int((1-tvsplit)*total_augmented_images)} images into training and {int(tvsplit*total_augmented_images)} images into validation for {class_name}.')
+    print(f'Augmenting {int((1 - tvsplit) * total_augmented_images)} images into training and {int(tvsplit * total_augmented_images)} images into validation for {class_name}.')
     num_digits = int(np.ceil(np.log10(total_augmented_images)))
+
     for imgf in image_files:
-        img = tf.keras.utils.load_img(
-            imgf, target_size=imres
-        )
-        img_array = tf.keras.utils.img_to_array(img)
-        img_array = tf.expand_dims(img_array, 0) # Create a batch
+        img = Image.open(imgf)
         fullname, ext = os.path.splitext(imgf)
+
         for idx in range(augmentations_per_image):
-            augmented_image = preprocessing_model(img_array)
+            augmented_image = transform(img)
             idxstr = str(idx)
-            idxstr = '0'*(num_digits-len(idxstr)) + idxstr
-            img = np.array(augmented_image[0])
-            img = img / np.max(img)
-            if np.random.rand()>tvsplit:
-                plt.imsave(os.path.join(train_dir,os.path.basename(fullname)+idxstr+ext),img)
+            idxstr = '0' * (num_digits - len(idxstr)) + idxstr
+            img = augmented_image.numpy().transpose(1, 2, 0)
+            img = np.clip(img, 0, 1)
+
+            if np.random.rand() > tvsplit:
+                plt.imsave(os.path.join(train_dir, os.path.basename(fullname) + idxstr + ext), img)
             else:
-                plt.imsave(os.path.join(val_dir,os.path.basename(fullname)+idxstr+ext),img)
+                plt.imsave(os.path.join(val_dir, os.path.basename(fullname) + idxstr + ext), img)
 
 
 def train_face_recognition_tf(training_dir='datasets_training', validation_dir='datasets_anime', imres=(96, 96), out_name='models/saved_model.h5', 
