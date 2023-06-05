@@ -192,6 +192,13 @@ def remove_grayscale_images(anime_file,images_path=''):
                 os.remove(full_name)
 
 
+def remove_colored_images(images_path):
+    imgs_list = files_in_dir(images_path)
+    for file in imgs_list:
+        if not is_gray(file):
+            os.remove(file)
+
+
 def overlapped_area(a, b):  # returns intersecting area >= 0
     # From https://stackoverflow.com/questions/27152904/calculate-overlapped-area-between-two-rectangles
     # a and b express rectangles as a = [a_xmin, a_ymin, a_xmax, a_ymax]
@@ -444,7 +451,7 @@ def crop_objects(img_name="input_img.png", img=None, model=None, cropped_dir='Im
     # Run inference
     result = inference_detector(model, img)
     # People are class 0, so remove those.
-    mask = np.logical_and(result.pred_instances.scores>score_threshold,result.pred_instances.labels>0).bool()
+    mask = np.logical_and(np.logical_and(result.pred_instances.scores>score_threshold,result.pred_instances.labels!=0),result.pred_instances.labels!=4).bool()
     bboxes = np.array(result.pred_instances.bboxes[mask]).astype(np.int32) # N boxes with [x1,y1,x2,y2] coords
     Nb = len(bboxes)
     # Check for overlap
@@ -557,8 +564,10 @@ def download_models():
 
 
 
-def crop_video_frames(videos_dir,out_dir='Images/anime-frames-cropped',skip_frames=500,save_square=True,save_rect=False,imres=(96,96)):
-    detector = None
+def crop_video_frames(videos_dir, out_dir_faces='Images/anime-frames/faces', out_dir_objs='Images/anime-frames/objects', skip_frames=500, 
+                        save_square=True, save_rect=False,imres=(96,96)):
+    face_detector = None
+    obj_model = None
     video_files = files_in_dir(videos_dir,["mkv","mp4","avi","webm"])
     for Ep,file in enumerate(video_files):
         Epstr = str(Ep+1)
@@ -592,8 +601,13 @@ def crop_video_frames(videos_dir,out_dir='Images/anime-frames-cropped',skip_fram
                     ms = str(ms)
                     ms = '0'*(3-len(ms)) + ms
                     cropped_name = 'Ep'+Epstr+'hh'+hh+'mm'+mm+'ss'+ss+'ms'+ms
-                    detector,idx0 = crop_faces(img_name=cropped_name, img=frame, detector=detector, cropped_dir=out_dir,score_threshold=.9,save_rect=save_rect,save_square=save_square,imres=imres)
-                    print(f'{idx0} images found for {cropped_name}')
+                    face_detector,idx0 = crop_faces(img_name=cropped_name, img=frame, detector=face_detector, cropped_dir=out_dir_faces,score_threshold=.4,
+                                                    save_rect=save_rect,save_square=save_square,imres=imres)
+                    print(f'{idx0} faces found for {cropped_name}')
+                    if not idx0: # only look for objects if we can't find any faces
+                        obj_model,idx0 = crop_objects(img_name=cropped_name, img=frame, model=obj_model, cropped_dir=out_dir_objs,score_threshold=.5,
+                                                        save_rect=save_rect,save_square=save_square,imres=imres)
+                        print(f'{idx0} objects found for {cropped_name}')
                     fidx = 0
                 else:
                     fidx += 1
@@ -685,37 +699,6 @@ def crop_orig_imgs(images_dir_top='Images/google-images-original', accepted_dir_
                 shutil.copy(file,os.path.join(noface_dir,os.path.basename(file)))
 
 
-def get_not_this_anime(anime_file,imres=(96,96)):
-    df = pd.read_csv(anime_file)
-    anime_name = anime_file.split('-')[0]
-    reject_strs = [anime_name]
-    for idx in df.index:
-        reject_strs.append(df.Name[idx])
-        if type(df.Other_Names[idx]) == str:
-            additional_keys = df.Other_Names[idx].split(',')
-            reject_strs.extend(additional_keys)
-    # Get dataset of anime images excluding our anime
-    parallel_worker_threads(search_keys="anime characters",token_names="anime_characters",imgs_path="Images/other_anime-original",num_images=1000,
-                            maxmissed=1000,reject_strs=reject_strs,simthresh=.3)
-    imgs_list = files_in_dir("Images/other_anime-original")
-    # This anime, Other anime, Manga, Not anime
-    other_anime_data_dir = os.path.join("datasetsTOMN","other_anime")
-    print(f"Generating dataset of other anime faces in {other_anime_data_dir}.")
-    for file in imgs_list:
-        crop_faces(img_name=file,cropped_dir=other_anime_data_dir,score_threshold=.9,save_rect=False,imres=imres)
-    # Delete unneeded directories, and in doing so remove any potentially problematic images.
-    shutil.rmtree("Images/other_anime-original")
-    # Get dataset of irl faces that definitely won't be our anime
-    parallel_worker_threads(search_keys="people's faces",token_names="people_faces",imgs_path="Images/not_anime-original",num_images=1000,simthresh=.2)
-    imgs_list = files_in_dir("Images/not_anime-original")
-    not_anime_data_dir = os.path.join("datasetsTON","not_anime")
-    print(f"Generating dataset of non-anime faces in {not_anime_data_dir}.")
-    for file in imgs_list:
-        crop_faces(img_name=file,cropped_dir=not_anime_data_dir,score_threshold=.9,save_rect=False,imres=imres)
-    # Delete unneeded directories, and in doing so remove any potentially problematic images.
-    shutil.rmtree("Images/not_anime-original")
-
-
 # This function takes as input a csv as generated by list_anime_characters,
 # and then runs other functions to download google images for each character.
 def get_character_images(anime_file,images_path='Images/character_images',imres=(96,96)):
@@ -738,6 +721,57 @@ def get_character_images(anime_file,images_path='Images/character_images',imres=
             crop_faces(img_name=file,cropped_dir=character_dir,score_threshold=.4,save_rect=False,imres=imres)
     # Delete unneeded directories, and in doing so remove any potentially problematic images.
     shutil.rmtree(images_path)
+
+
+def get_not_this_anime(anime_file, dataset_top='datasetsTOMON', imres=(96,96)):
+    df = pd.read_csv(anime_file)
+    anime_name = anime_file.split('-')[0]
+    # Get dataset of anime images excluding our anime
+    reject_strs = [anime_name]
+    for idx in df.index:
+        reject_strs.append(df.Name[idx])
+        if type(df.Other_Names[idx]) == str:
+            additional_keys = df.Other_Names[idx].split(',')
+            reject_strs.extend(additional_keys)
+    anime_names = ['One Piece', 'Naruto', 'Jojos', 'Bleach', 'Monster', 'Gintama']
+    other_anime = list(set(anime_names)-set([anime_name]))
+    other_anime_queries = [s + " anime characters" for s in other_anime] 
+    other_anime_queries.append("other anime")
+    token_names = [s.replace(" ","_") for s in other_anime_queries]
+    parallel_worker_threads(search_keys=other_anime_queries,token_names=token_names,imgs_path="Images/other_anime-original",num_images=500,
+                            maxmissed=1000,reject_strs=reject_strs,simthresh=.3)
+    imgs_list = files_in_dir("Images/other_anime-original")
+    # This anime, Other anime, Manga, Objects, Not anime
+    out_data_dir = os.path.join(dataset_top,"other_anime")
+    print(f"Generating dataset of other anime faces in {out_data_dir}.")
+    for file in imgs_list:
+        crop_faces(img_name=file,cropped_dir=out_data_dir,score_threshold=.9,save_rect=False,imres=imres)
+    # Delete unneeded directories, and in doing so remove any potentially problematic images.
+    shutil.rmtree("Images/other_anime-original")
+    
+    # Get dataset of manga images for the anime.
+    search_query = f"{anime_name} manga characters"
+    parallel_worker_threads(search_keys=search_query,token_names="manga_characters",imgs_path="Images/manga-original",num_images=1000,
+                            maxmissed=1000,reject_strs=reject_strs,simthresh=.3)
+    out_data_dir = os.path.join(dataset_top,"manga")
+    remove_colored_images("Images/manga-original") # keep only black-and-white downloaded images
+    imgs_list = files_in_dir("Images/manga-original")
+    print(f"Generating dataset of {anime_name} manga faces in {out_data_dir}.")
+    for file in imgs_list:
+        crop_faces(img_name=file,cropped_dir=out_data_dir,score_threshold=.5,save_rect=False,imres=imres)
+    # Delete unneeded directories, and in doing so remove any potentially problematic images.
+    shutil.rmtree("Images/manga-original")
+
+    # Get dataset of irl faces that definitely won't be our anime
+    parallel_worker_threads(search_keys="people's faces",token_names="people_faces",imgs_path="Images/not_anime-original",num_images=1000,simthresh=.2)
+    imgs_list = files_in_dir("Images/not_anime-original")
+    out_data_dir = os.path.join(dataset_top,"not_anime")
+    print(f"Generating dataset of non-anime faces in {out_data_dir}.")
+    for file in imgs_list:
+        crop_faces(img_name=file,cropped_dir=out_data_dir,score_threshold=.9,save_rect=False,imres=imres)
+    # Delete unneeded directories, and in doing so remove any potentially problematic images.
+    shutil.rmtree("Images/not_anime-original")
+
 
 def initialize_training_set(base_dir="Images/myanimelist-images-original",out_dir="datasets_training",imres=(96,96)):
     class_names = sorted(glob.glob(os.path.join(base_dir,"*")))
@@ -766,5 +800,7 @@ if __name__ == '__main__':
     # filter_google_images()
     # create_unlabeled_set()
     # get_not_this_anime_("Monster-Characters.csv")
-    crop_objects("Images/google-images-noface/Johan_Liebert/_Monster_307.jpeg")
+    # get_not_this_anime('Monster-Characters.csv',imres=(256,256))
+    # crop_video_frames('Monster.S01.480p.NF.WEB-DL.DDP2.0.x264-Emmid',skip_frames=400,save_rect=False,save_square=True,imres=(256,256))
+    crop_objects("Images/google-images-noface/Johan_Liebert/_Monster_307.jpeg", imres=(299,299))
 
