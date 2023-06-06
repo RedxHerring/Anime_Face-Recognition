@@ -1,4 +1,3 @@
-import tensorflow_hub as hub
 import numpy as np
 import glob
 import os
@@ -9,7 +8,6 @@ import random
 import shutil
 import matplotlib.pyplot as plt
 from scipy.signal import find_peaks
-from skimage import exposure
 import shutil
 
 from utils import files_in_dir, remove_duplicates
@@ -25,114 +23,21 @@ from torchvision.datasets import ImageFolder
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 
-def train_image_type(base_dir='datasetsTON',imres=(96,96),out_name='models/image_type_classifier_model.h5'):
-    # Set up the CNN model
-    model = keras.Sequential([
-        layers.Conv2D(32, (3, 3), activation='relu', input_shape=(imres[0], imres[1], 3)),
-        layers.MaxPooling2D((2, 2)),
-        layers.Conv2D(64, (3, 3), activation='relu'),
-        layers.MaxPooling2D((2, 2)),
-        layers.Conv2D(128, (3, 3), activation='relu'),
-        layers.MaxPooling2D((2, 2)),
-        layers.Flatten(),
-        layers.Dense(128, activation='relu'),
-        layers.Dropout(0.5),
-        layers.Dense(3, activation='softmax')
-    ])
-    # Compile the model
-    model.compile(optimizer='adam',
-                loss='categorical_crossentropy',
-                metrics=['accuracy'])
-    # Data augmentation to improve generalization
-    datagen = ImageDataGenerator(
-        rescale=1./255,
-        shear_range=0.2,
-        zoom_range=0.2,
-        horizontal_flip=True
-    )
-    # Define directories
-    train_data_dir = os.path.join(base_dir, 'training')
-    validation_data_dir = os.path.join(base_dir, 'validation')
-    # reset contents of directories
-    shutil.rmtree(train_data_dir,ignore_errors=True)
-    shutil.rmtree(validation_data_dir,ignore_errors=True)
-    # remaining directories are the discrete classes
-    class_names = glob.glob(os.path.join(base_dir,'*'))
-    # Recreate directory
-    os.makedirs(train_data_dir,exist_ok=True)
-    for class_dir in class_names:
-        shutil.copytree(class_dir,os.path.join(train_data_dir,os.path.basename(class_dir)))
-
-    # Move a fraction of files from train directory to validation directory
-    validation_split = 0.05  # Fraction of files to move to validation
-    for class_name in os.listdir(train_data_dir):
-        class_dir = os.path.join(train_data_dir, class_name)
-        files = os.listdir(class_dir)
-        num_validation_files = int(validation_split * len(files))
-        validation_files = random.sample(files, num_validation_files)
-        # Move validation files to validation directory
-        for file_name in validation_files:
-            src_path = os.path.join(class_dir, file_name)
-            dst_path = os.path.join(validation_data_dir, class_name, file_name)
-            os.makedirs(os.path.join(validation_data_dir, class_name), exist_ok=True)
-            shutil.move(src_path, dst_path)
-
-    # Load and preprocess the dataset
-    batch_size = 32
-    train_generator = datagen.flow_from_directory(
-        train_data_dir,
-        target_size=imres,
-        batch_size=batch_size,
-        class_mode='categorical'
-    )
-    # Validation data generator
-    validation_generator = datagen.flow_from_directory(
-        validation_data_dir,
-        target_size=imres,
-        batch_size=batch_size,
-        class_mode='categorical',
-    )
-    # Train the model
-    epochs = 10
-    history = model.fit(
-        train_generator,
-        steps_per_epoch=train_generator.samples // batch_size,
-        validation_data=validation_generator,
-        validation_steps=validation_generator.samples // batch_size,
-        epochs=epochs,
-        verbose=1
-    )
-    # Extract accuracy values from the training history
-    training_accuracy = history.history['accuracy']
-    validation_accuracy = history.history['val_accuracy']
-    # Print accuracy for each epoch
-    for epoch in range(epochs):
-        print(f"Epoch {epoch+1} - Training Accuracy: {training_accuracy[epoch]:.4f} - Validation Accuracy: {validation_accuracy[epoch]:.4f}")
-    # Save the trained model
-    model.save(out_name)
-    return model
-
-
-def classify_image_type(image_path,model=None,model_name='models/image_type_classifier_model.h5'):
-    # Load the trained model
-    if model is None:
-        model = keras.models.load_model(model_name)
-
-    # Define the class labels
-    class_labels = sorted(['this_anime', 'other_anime', 'not_anime'])
-
-    # reprocess the new image
-    image = load_img(image_path, target_size=(96, 96))
-    image = img_to_array(image)
-    image = image / 255.0
-    image = tf.expand_dims(image, 0)  # Add a batch dimension
-
-    # Make predictions
-    predictions = model.predict(image)
-    predicted_class_index = tf.argmax(predictions, axis=1)[0]
-    predicted_class_label = class_labels[predicted_class_index]
-
-    return predicted_class_label, model
+def train_val_split(train_dir_top, tvsplit=0.1):
+    classes = list(set(os.listdir(train_dir_top)) - set(['train', 'val']))
+    shutil.rmtree(os.path.join(train_dir_top,'train'),ignore_errors=True)
+    shutil.rmtree(os.path.join(train_dir_top,'val'),ignore_errors=True)
+    for img_class in classes:
+        imgs_list = files_in_dir(os.path.join(train_dir_top,img_class))
+        train_dir = os.path.join(train_dir_top,'train',img_class)
+        val_dir = os.path.join(train_dir_top,'val',img_class)
+        os.makedirs(train_dir)
+        os.makedirs(val_dir)
+        for file in imgs_list:
+            if np.random.rand() > tvsplit:
+                shutil.copy(file,os.path.join(train_dir,os.path.basename(file)))
+            else:
+                shutil.copy(file,os.path.join(val_dir,os.path.basename(file)))
 
 
 def create_missing_classes(training_dir,validation_dir):
@@ -149,15 +54,6 @@ def create_missing_classes(training_dir,validation_dir):
         out_name = os.path.join(out_dir,base_name+'_hflip'+ext)
         cv2.imwrite(out_name,img)
 
-
-def build_dataset(base_dir='datasets_recursive', imres=(96, 96), subset='training'):
-    return tf.keras.preprocessing.image_dataset_from_directory(
-        base_dir,
-        validation_split=0,
-        label_mode="categorical",
-        seed=321,
-        image_size=imres,
-        batch_size=1)
 
 
 class AugmentedDataset(Dataset):
@@ -191,7 +87,6 @@ def augment_images(in_dir, out_dir, total_augmented_images=50, imres=(96, 96), t
         transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
 
     # Get image files
@@ -385,7 +280,16 @@ def initialize_model(model_name, num_classes, feature_extract, use_pretrained=Tr
     #   variables is model specific.
     model_ft = None
 
-    if model_name == "resnet":
+    if model_name == "resnet50":
+        """ Resnet50
+        """
+        model_ft = models.resnet50(pretrained=use_pretrained)
+        set_parameter_requires_grad(model_ft, feature_extract)
+        num_ftrs = model_ft.fc.in_features
+        model_ft.fc = nn.Linear(num_ftrs, num_classes)
+        input_size = 224
+
+    if model_name == "resnet101":
         """ Resnet101
         """
         model_ft = models.resnet101(pretrained=use_pretrained)
@@ -443,6 +347,34 @@ def initialize_model(model_name, num_classes, feature_extract, use_pretrained=Tr
         num_ftrs = model_ft.fc.in_features
         model_ft.fc = nn.Linear(num_ftrs,num_classes)
         input_size = 299
+    
+    elif model_name == "efficientnet":
+        """ Efficientnet B7
+        Be careful, expects (299,299) sized images and has auxiliary output
+        """
+        model_ft = models.efficientnet_b7(weights='DEFAULT')
+        set_parameter_requires_grad(model_ft, feature_extract)
+        # Handle the auxilary net
+        num_ftrs = model_ft.AuxLogits.fc.in_features
+        model_ft.AuxLogits.fc = nn.Linear(num_ftrs, num_classes)
+        # Handle the primary net
+        num_ftrs = model_ft.fc.in_features
+        model_ft.fc = nn.Linear(num_ftrs,num_classes)
+        input_size = 600
+
+    elif model_name == "efficientnetv2":
+        """ EfficientnetV2 L
+        Be careful, expects (299,299) sized images and has auxiliary output
+        """
+        model_ft = models.efficientnet_v2_l(weights='DEFAULT')
+        set_parameter_requires_grad(model_ft, feature_extract)
+        # Handle the auxilary net
+        num_ftrs = model_ft.AuxLogits.fc.in_features
+        model_ft.AuxLogits.fc = nn.Linear(num_ftrs, num_classes)
+        # Handle the primary net
+        num_ftrs = model_ft.fc.in_features
+        model_ft.fc = nn.Linear(num_ftrs,num_classes)
+        input_size = 600
 
     else:
         print("Invalid model name, exiting...")
@@ -979,6 +911,8 @@ if __name__ == "__main__":
     # augment_images('datasets_iterative0/Kenzou_Tenma','augmented_images',150)
     # classify_all_characters_tf('datasets_anime','datasets_iterative1',model_name='models/FRmodel2.h5',ac_min=.15,ac_max=.2)
     # augment_dataset('datasets_iterative1','datasets_augmented1tv',200,tvsplit=.1)
-    run_finetune_model_torch(train_dir='datasets_augmented1tv/train',val_dir='datasets_augmented1tv/val',model_name="resnet",out_name="models/FRmodel1.pt")
+    train_val_split('datasetsTOMON/')
+    run_finetune_model_torch(train_dir='datasetsTOMON/train',val_dir='datasetsTOMON/val',model_name="resnet101",out_name="models/image_model.pt")
+    # run_finetune_model_torch(train_dir='datasets_augmented1tv/train',val_dir='datasets_augmented1tv/val',model_name="resnet",out_name="models/FRmodel1.pt")
     # model = train_face_recognition_1shot_torch(training_dir='datasets_iterative0',validation_dir='datasets_anime',imres=(96,96),num_augmented_images=150,out_name='models/one_shot.pt')
 
