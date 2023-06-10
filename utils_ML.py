@@ -1,3 +1,16 @@
+import torch
+# source /opt/intel/oneapi/setvars.sh
+# export LD_PRELOAD=/usr/lib/libstdc++.so.6.0.31
+# Define ML device globally in this file
+if torch.cuda.is_available():
+    device = torch.device("cuda")
+else:
+    try:
+        import intel_extension_for_pytorch as ipex
+        device = 'xpu'
+    except: 
+        device = "cpu"
+
 import numpy as np
 import glob
 import os
@@ -13,7 +26,7 @@ import shutil
 from utils import files_in_dir, remove_duplicates
 
 import cv2
-import torch
+from PIL import Image
 from torch import nn, optim
 from torch.utils.data import DataLoader
 from torchvision import transforms, datasets, models
@@ -71,46 +84,74 @@ class AugmentedDataset(Dataset):
         return image, label
 
 
-def augment_images(in_dir, out_dir, total_augmented_images=50, imres=(96, 96), tvsplit=0.2):
+def augment_images(in_dir, out_dir, total_images=50, imres=(96, 96), tvsplit=0.2, copy_base=False):
+    '''
+    Given a single directory with images and a desired number of total images, 
+    augment the images as needed to meet or excceed the desired number
+    INPUTS
+    in_dir - single directory with images inside, treated as unique base images
+    out_dir - directory for augmented images, which may not contain any images from in_dir
+    total_images - total nuumber of iamges to be saved in out_dir
+    imres - tuple for output resolution
+    tvsplit - fraction of images to be saved in validation directory
+    copy_base - boolean to copy over images used for augmentation into the output training set
+    '''
     out_dir_top = os.path.dirname(out_dir)
     class_name = os.path.basename(out_dir)
     train_dir = os.path.join(out_dir_top, 'train', class_name)
     val_dir = os.path.join(out_dir_top, 'val', class_name)
     os.makedirs(train_dir, exist_ok=True)
     os.makedirs(val_dir, exist_ok=True)
-
-    # Data augmentation
-    transform = transforms.Compose([
-        transforms.RandomRotation(15),
-        transforms.RandomAffine(degrees=0, translate=(0, 0.2), shear=0.2),
-        transforms.RandomResizedCrop(imres, scale=(0.8, 1.2)),
-        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2),
-        transforms.RandomHorizontalFlip(),
-        transforms.ToTensor(),
-    ])
-
     # Get image files
-    image_files = [os.path.join(in_dir, f) for f in os.listdir(in_dir) if os.path.isfile(os.path.join(in_dir, f))]
-    augmentations_per_image = int(np.ceil(total_augmented_images / len(image_files)))
+    image_files = files_in_dir(in_dir)
+    if copy_base:
+        num_augmented = max(0, total_images-len(image_files))
+    else:
+        num_augmented = total_images
+    augmentations_per_image = int(np.ceil(num_augmented / len(image_files)))
+    # Data augmentation
+    if augmentations_per_image == 1: # just one transform
+        transform = transforms.Compose([transforms.RandomHorizontalFlip(1)]) # guaranteed flip
+    else:
+        transform = transforms.Compose([
+            transforms.RandomRotation(15),
+            transforms.RandomAffine(degrees=0, translate=(0, 0.2), shear=0.2),
+            transforms.RandomResizedCrop(imres, scale=(0.8, 1.2)),
+            transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+        ])
     total_augmented_images = augmentations_per_image * len(image_files)
     print(f'Augmenting {int((1 - tvsplit) * total_augmented_images)} images into training and {int(tvsplit * total_augmented_images)} images into validation for {class_name}.')
     num_digits = int(np.ceil(np.log10(total_augmented_images)))
-
+    Tvsplit = np.ceil(1/tvsplit)
     for imgf in image_files:
         img = Image.open(imgf)
         fullname, ext = os.path.splitext(imgf)
-
+        basename = os.path.basename(fullname)
+        if copy_base:
+            shutil.copy(imgf,os.path.join(train_dir,basename+ext))
         for idx in range(augmentations_per_image):
             augmented_image = transform(img)
+            if type(augmented_image) is torch.Tensor:
+                augmented_image = transforms.ToPILImage()(augmented_image)
             idxstr = str(idx)
-            idxstr = '0' * (num_digits - len(idxstr)) + idxstr
-            img = augmented_image.numpy().transpose(1, 2, 0)
-            img = np.clip(img, 0, 1)
-
-            if np.random.rand() > tvsplit:
-                plt.imsave(os.path.join(train_dir, os.path.basename(fullname) + idxstr + ext), img)
+            idxstr = '_' + '0'*(num_digits-len(idxstr)) + idxstr
+            if (idx+1)%Tvsplit:
+                augmented_image.save(os.path.join(train_dir, basename + idxstr + ext))
             else:
-                plt.imsave(os.path.join(val_dir, os.path.basename(fullname) + idxstr + ext), img)
+                augmented_image.save(os.path.join(val_dir, basename + idxstr + ext))
+
+
+def augment_dataset(in_dir='dataset_base', out_dir='dataset_augmented', num_augmented=100, tvsplit=.1, copy_base=False):
+    '''
+    Loop through subdirectories and augment datasets.
+    '''
+    shutil.rmtree(os.path.join(in_dir,'train'),ignore_errors=True)
+    shutil.rmtree(os.path.join(in_dir,'val'),ignore_errors=True)
+    class_dirs = sorted(os.listdir(in_dir))
+    for dir in class_dirs:
+        augment_images(os.path.join(in_dir,dir),os.path.join(out_dir,dir),total_images=num_augmented,tvsplit=tvsplit, copy_base=copy_base)
 
 
 def train_face_recognition_tf(training_dir='datasets_training', validation_dir='datasets_anime', imres=(96, 96), out_name='models/saved_model.h5', 
@@ -744,12 +785,6 @@ def train_face_recognition_1shot_torch(training_dir='datasets_training', validat
     return model
 
 
-def augment_dataset(in_dir='dataset_base',out_dir='dataset_augmented',num_augmented=100,tvsplit=.1):
-    class_dirs = sorted(os.listdir(in_dir))
-    for dir in class_dirs:
-        augment_images(os.path.join(in_dir,dir),os.path.join(out_dir,dir),total_augmented_images=num_augmented,tvsplit=tvsplit)
-
-
 def load_existing_model(model_name='models/saved_model.h5'):
     model = tf.keras.models.load_model(model_name,
        custom_objects={'KerasLayer':hub.KerasLayer})
@@ -910,9 +945,9 @@ if __name__ == "__main__":
     # model = load_existing_model()
     # augment_images('datasets_iterative0/Kenzou_Tenma','augmented_images',150)
     # classify_all_characters_tf('datasets_anime','datasets_iterative1',model_name='models/FRmodel2.h5',ac_min=.15,ac_max=.2)
-    # augment_dataset('datasets_iterative1','datasets_augmented1tv',200,tvsplit=.1)
-    train_val_split('datasetsTOMON/')
-    run_finetune_model_torch(train_dir='datasetsTOMON/train',val_dir='datasetsTOMON/val',model_name="resnet101",out_name="models/image_model.pt")
+    augment_dataset('datasetsTOMON','datasetsTOMON',4000,tvsplit=.1)
+    # train_val_split('datasetsTOMON/')
+    # run_finetune_model_torch(train_dir='datasetsTOMON/train',val_dir='datasetsTOMON/val',model_name="resnet101",out_name="models/image_model.pt")
     # run_finetune_model_torch(train_dir='datasets_augmented1tv/train',val_dir='datasets_augmented1tv/val',model_name="resnet",out_name="models/FRmodel1.pt")
     # model = train_face_recognition_1shot_torch(training_dir='datasets_iterative0',validation_dir='datasets_anime',imres=(96,96),num_augmented_images=150,out_name='models/one_shot.pt')
 
