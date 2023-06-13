@@ -7,6 +7,10 @@ if torch.cuda.is_available():
 else:
     try:
         import intel_extension_for_pytorch as ipex
+        model = torch.nn.Conv2d(3, 4, (16,16)) # create dummy model
+        model.eval()
+        model = model.to('xpu')
+        # If we get this far without error, this should be ok
         device = 'xpu'
     except: 
         device = "cpu"
@@ -30,7 +34,6 @@ from PIL import Image
 from torch import nn, optim
 from torch.utils.data import DataLoader
 from torchvision import transforms, datasets, models
-from torchvision.models import efficientnet_v2_l
 from torch.utils.data import Dataset, DataLoader
 from torchvision.datasets import ImageFolder
 from torch.optim.lr_scheduler import ReduceLROnPlateau
@@ -68,22 +71,6 @@ def create_missing_classes(training_dir,validation_dir):
         cv2.imwrite(out_name,img)
 
 
-
-class AugmentedDataset(Dataset):
-    def __init__(self, dataset, total_augmented_images, transform):
-        self.dataset = dataset
-        self.total_augmented_images = total_augmented_images
-        self.transform = transform
-
-    def __len__(self):
-        return self.total_augmented_images
-
-    def __getitem__(self, index):
-        image, label = self.dataset[index % len(self.dataset)]
-        image = self.transform(image)
-        return image, label
-
-
 def augment_images(in_dir, out_dir, total_images=50, imres=(96, 96), tvsplit=0.2, copy_base=False):
     '''
     Given a single directory with images and a desired number of total images, 
@@ -110,203 +97,51 @@ def augment_images(in_dir, out_dir, total_images=50, imres=(96, 96), tvsplit=0.2
         num_augmented = total_images
     augmentations_per_image = int(np.ceil(num_augmented / len(image_files)))
     # Data augmentation
-    if augmentations_per_image == 1: # just one transform
-        transform = transforms.Compose([transforms.RandomHorizontalFlip(1)]) # guaranteed flip
-    else:
-        transform = transforms.Compose([
-            transforms.RandomRotation(15),
-            transforms.RandomAffine(degrees=0, translate=(0, 0.2), shear=0.2),
-            transforms.RandomResizedCrop(imres, scale=(0.8, 1.2)),
-            transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-        ])
+    transform = transforms.Compose([
+        transforms.RandomRotation(15),
+        transforms.RandomAffine(degrees=0, translate=(0, 0.2), shear=0.2),
+        transforms.RandomResizedCrop(imres, scale=(0.8, 1.2)),
+        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2),
+        transforms.RandomHorizontalFlip(p=.25),
+        transforms.ToTensor(),
+    ])
     total_augmented_images = augmentations_per_image * len(image_files)
     print(f'Augmenting {int((1 - tvsplit) * total_augmented_images)} images into training and {int(tvsplit * total_augmented_images)} images into validation for {class_name}.')
-    num_digits = int(np.ceil(np.log10(total_augmented_images)))
-    Tvsplit = np.ceil(1/tvsplit)
+    if total_augmented_images:
+        num_digits = int(np.ceil(np.log10(total_augmented_images)))
+    else:
+        num_digits = 1
     for imgf in image_files:
         img = Image.open(imgf)
         fullname, ext = os.path.splitext(imgf)
         basename = os.path.basename(fullname)
         if copy_base:
-            shutil.copy(imgf,os.path.join(train_dir,basename+ext))
+            if np.random.rand() > tvsplit:
+                shutil.copy(imgf,os.path.join(train_dir,basename+ext))
+            else:
+                shutil.copy(imgf,os.path.join(val_dir,basename+ext))
         for idx in range(augmentations_per_image):
             augmented_image = transform(img)
             if type(augmented_image) is torch.Tensor:
                 augmented_image = transforms.ToPILImage()(augmented_image)
             idxstr = str(idx)
             idxstr = '_' + '0'*(num_digits-len(idxstr)) + idxstr
-            if (idx+1)%Tvsplit:
+            if np.random.rand() > tvsplit:
                 augmented_image.save(os.path.join(train_dir, basename + idxstr + ext))
             else:
                 augmented_image.save(os.path.join(val_dir, basename + idxstr + ext))
 
 
-def augment_dataset(in_dir='dataset_base', out_dir='dataset_augmented', num_augmented=100, tvsplit=.1, copy_base=False):
+def augment_dataset(in_dir='dataset_base', out_dir='dataset_augmented', num_augmented=100, tvsplit=.1, imres=(96,96), copy_base=False):
     '''
     Loop through subdirectories and augment datasets.
     '''
-    shutil.rmtree(os.path.join(in_dir,'train'),ignore_errors=True)
-    shutil.rmtree(os.path.join(in_dir,'val'),ignore_errors=True)
+    # reset tv split
+    shutil.rmtree(os.path.join(out_dir,'train'),ignore_errors=True)
+    shutil.rmtree(os.path.join(out_dir,'val'),ignore_errors=True)
     class_dirs = sorted(os.listdir(in_dir))
     for dir in class_dirs:
-        augment_images(os.path.join(in_dir,dir),os.path.join(out_dir,dir),total_images=num_augmented,tvsplit=tvsplit, copy_base=copy_base)
-
-
-def train_face_recognition_tf(training_dir='datasets_training', validation_dir='datasets_anime', imres=(96, 96), out_name='models/saved_model.h5', 
-                            batch_size=16, reg=.01, drprate=.7, num_epochs=5, lr=.001, model=None):
-    warnings.filterwarnings("ignore")
-    checkpoint_path = "checkpt"
-    create_missing_classes(training_dir=training_dir, validation_dir=validation_dir)
-
-    # Prepare training and validation datasets
-    normalization_layer = tf.keras.layers.Rescaling(1. / 255)
-
-    training_set = build_dataset(training_dir, imres, "training")
-    class_names = tuple(training_set.class_names)
-    training_size = training_set.cardinality().numpy()
-    training_set = training_set.unbatch().repeat().batch(batch_size)
-    training_set = training_set.map(lambda images, labels: (normalization_layer(images), labels))
-    
-    validation_set = build_dataset(validation_dir, subset='validation')
-    validation_size = validation_set.cardinality().numpy()
-    validation_set = validation_set.unbatch().batch(batch_size)
-    validation_set = validation_set.map(lambda images, labels: (normalization_layer(images), labels))
-
-    do_fine_tuning = True
-    if model is None:
-        model = tf.keras.Sequential([
-            tf.keras.layers.InputLayer(input_shape=imres + (3,)),
-            hub.KerasLayer('https://tfhub.dev/tensorflow/efficientnet/b7/feature-vector/1', trainable=do_fine_tuning),
-            tf.keras.layers.Dropout(rate=drprate),
-            tf.keras.layers.Dense(len(class_names),
-                                kernel_regularizer=tf.keras.regularizers.l2(reg))
-        ])
-    else:
-        # Update the l2 regularization of the input model
-        for layer in model.layers:
-            if isinstance(layer, tf.keras.layers.Dense):
-                layer.kernel_regularizer = tf.keras.regularizers.l2(reg)
-    decay_rate = lr / num_epochs
-    model.compile(
-        optimizer=tf.keras.optimizers.legacy.SGD(
-            learning_rate=lr, momentum=0.9, nesterov=False, decay=decay_rate),
-        loss=tf.keras.losses.CategoricalCrossentropy(from_logits=True, label_smoothing=0.1),
-        metrics=['accuracy', tf.keras.metrics.TopKCategoricalAccuracy(name='top-5-accuracy')],
-    )
-    callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=6)
-    reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.2, patience=3, min_lr=0.00001)
-    checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
-        checkpoint_path,
-        monitor="val_accuracy",
-        save_best_only=True,
-        save_weights_only=True,
-    )
-    steps_per_epoch = training_size // batch_size
-    validation_steps = validation_size // batch_size
-
-    hist = model.fit(
-        training_set,
-        epochs=num_epochs,
-        steps_per_epoch=steps_per_epoch,
-        validation_data=validation_set,
-        validation_steps=validation_steps,
-        callbacks=[reduce_lr, checkpoint_callback, callback]
-    ).history
-    model.save(out_name)
-    return model, hist
-
-
-def train_face_recognition_torch(recursive_dir='datasets_recursive', source_dir='datasets_anime', imres=(96, 96), out_name='models/saved_model.pt'):
-    batch_size = 16
-    if torch.cuda.is_available():
-        device = torch.device("cuda")
-    else:
-        try:
-            import intel_extension_for_pytorch as ipex
-            device = 'xpu'
-        except: 
-            device = "cpu"
-    
-    create_missing_classes(training_dir=recursive_dir, validation_dir=source_dir)
-
-    # Data transformations
-    data_transform = transforms.Compose([
-        transforms.RandomRotation(30),
-        transforms.RandomHorizontalFlip(),
-        transforms.RandomResizedCrop(imres, scale=(0.8, 1.0), ratio=(0.9, 1.1)),
-        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
-        transforms.ToTensor(),
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-    ])
-    # Load datasets
-    train_dataset = datasets.ImageFolder(root=recursive_dir, transform=data_transform)
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=2)
-    validation_dataset = datasets.ImageFolder(root=source_dir, transform=data_transform)
-    validation_loader = DataLoader(validation_dataset, batch_size=batch_size, shuffle=False, num_workers=2)
-
-    # Define the model
-    model = efficientnet_v2_l()
-    # Define the loss function and optimizer
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
-    # intitial train
-    model.train()
-    ### set to device and continue
-    model.to(device)
-    criterion.to(device)
-    if device == 'xpu':
-        model, optimizer = ipex.optimize(model, optimizer=optimizer)
-    # Training loop
-    num_epochs = 100
-    for epoch in range(num_epochs):
-        model.train()
-        running_loss = 0.0
-        train_correct = 0
-        train_total = 0
-        for images, labels in train_loader:
-            images, labels = images.to(device), labels.to(device)
-            optimizer.zero_grad()
-            outputs = model(images)
-            loss = criterion(outputs, labels)
-            loss.backward()
-            optimizer.step()
-
-            running_loss += loss.item()
-
-            _, predicted = torch.max(outputs.data, 1)
-            train_total += labels.size(0)
-            train_correct += (predicted == labels).sum().item()
-
-        train_accuracy = 100 * train_correct / train_total
-        # Validation loop
-        model.eval()
-        val_loss = 0.0
-        val_correct = 0
-        val_total = 0
-        with torch.no_grad():
-            for images, labels in validation_loader:
-                images, labels = images.to(device), labels.to(device)
-
-                outputs = model(images)
-                loss = criterion(outputs, labels)
-
-                val_loss += loss.item()
-
-                _, predicted = torch.max(outputs.data, 1)
-                val_total += labels.size(0)
-                val_correct += (predicted == labels).sum().item()
-
-        val_accuracy = 100 * val_correct / val_total
-        print(f"Epoch [{epoch+1}/{num_epochs}] - "
-              f"Train Loss: {running_loss / len(train_loader):.4f}, "
-              f"Train Accuracy: {train_accuracy:.2f}%, "
-              f"Validation Loss: {val_loss / len(validation_loader):.4f}, "
-              f"Validation Accuracy: {val_accuracy:.2f}%")
-    # Save the trained model
-    torch.save(model.state_dict(), out_name)
-    return model
+        augment_images(os.path.join(in_dir,dir),os.path.join(out_dir,dir),total_images=num_augmented,imres=imres,tvsplit=tvsplit,copy_base=copy_base)
 
 
 # helper functions from https://pytorch.org/tutorials/beginner/finetuning_torchvision_models_tutorial.html
@@ -329,8 +164,9 @@ def initialize_model(model_name, num_classes, feature_extract, use_pretrained=Tr
         num_ftrs = model_ft.fc.in_features
         model_ft.fc = nn.Linear(num_ftrs, num_classes)
         input_size = 224
+        ft_transforms = models.ResNet50_Weights.IMAGENET1K_V2.transforms 
 
-    if model_name == "resnet101":
+    elif model_name == "resnet101":
         """ Resnet101
         """
         model_ft = models.resnet101(pretrained=use_pretrained)
@@ -338,6 +174,16 @@ def initialize_model(model_name, num_classes, feature_extract, use_pretrained=Tr
         num_ftrs = model_ft.fc.in_features
         model_ft.fc = nn.Linear(num_ftrs, num_classes)
         input_size = 224
+    
+    elif model_name == "resnet152":
+        """ Resnet152
+        """
+        model_ft = models.resnet152(pretrained=use_pretrained)
+        set_parameter_requires_grad(model_ft, feature_extract)
+        num_ftrs = model_ft.fc.in_features
+        model_ft.fc = nn.Linear(num_ftrs, num_classes)
+        input_size = 224
+        ft_transforms = models.ResNet152_Weights.IMAGENET1K_V2.transforms 
 
     elif model_name == "alexnet":
         """ Alexnet
@@ -393,38 +239,52 @@ def initialize_model(model_name, num_classes, feature_extract, use_pretrained=Tr
         """ Efficientnet B7
         Be careful, expects (299,299) sized images and has auxiliary output
         """
-        model_ft = models.efficientnet_b7(weights='DEFAULT')
+        if use_pretrained:
+            model_ft = models.efficientnet_b7(weights='DEFAULT')
+        else:
+            model_ft = models.efficientnet_b7()
         set_parameter_requires_grad(model_ft, feature_extract)
-        # Handle the auxilary net
-        num_ftrs = model_ft.AuxLogits.fc.in_features
-        model_ft.AuxLogits.fc = nn.Linear(num_ftrs, num_classes)
-        # Handle the primary net
-        num_ftrs = model_ft.fc.in_features
-        model_ft.fc = nn.Linear(num_ftrs,num_classes)
+        model_ft.classifier = torch.nn.Linear(model_ft.classifier.in_features, num_classes)
         input_size = 600
 
-    elif model_name == "efficientnetv2":
-        """ EfficientnetV2 L
-        Be careful, expects (299,299) sized images and has auxiliary output
+    elif model_name == "efficientnetv2S":
+        """ EfficientnetV2 S
         """
-        model_ft = models.efficientnet_v2_l(weights='DEFAULT')
+        if use_pretrained:
+            model_ft = models.efficientnet_v2_s(weights='DEFAULT')
+        else:
+            model_ft = models.efficientnet_v2_s()
         set_parameter_requires_grad(model_ft, feature_extract)
-        # Handle the auxilary net
-        num_ftrs = model_ft.AuxLogits.fc.in_features
-        model_ft.AuxLogits.fc = nn.Linear(num_ftrs, num_classes)
-        # Handle the primary net
-        num_ftrs = model_ft.fc.in_features
-        model_ft.fc = nn.Linear(num_ftrs,num_classes)
-        input_size = 600
+        # Get the number of output features from the last layer
+        num_features = model_ft.features[-1][1].num_features
+        # Replace the last layer with a new linear layer with num_classes outputs
+        model_ft.classifier = torch.nn.Linear(num_features, num_classes)
+        input_size = 384
+        ft_transforms = models.EfficientNet_V2_S_Weights.IMAGENET1K_V1.transforms
+    
+    elif model_name == "efficientnetv2L":
+        """ EfficientnetV2 L
+        """
+        if use_pretrained:
+            model_ft = models.efficientnet_v2_l(weights='DEFAULT')
+        else:
+            model_ft = models.efficientnet_v2_l()
+        set_parameter_requires_grad(model_ft, feature_extract)
+        # Get the number of output features from the last layer
+        num_features = model_ft.features[-1][1].num_features
+        # Replace the last layer with a new linear layer with num_classes outputs
+        model_ft.classifier = torch.nn.Linear(num_features, num_classes)
+        input_size = 400
+        # input_size = 480
 
     else:
         print("Invalid model name, exiting...")
         exit()
 
-    return model_ft, input_size
+    return model_ft, input_size, ft_transforms
 
 
-def train_model(model, dataloaders, criterion, optimizer, num_epochs=25, is_inception=False, device='cpu'):
+def train_model(model, dataloaders, criterion, optimizer, num_epochs=25, is_inception=False, l1_lambda = 0.001):
     since = time.time()
     val_acc_history = []
     best_model_wts = copy.deepcopy(model.state_dict())
@@ -462,6 +322,13 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs=25, is_ince
                     else:
                         outputs = model(inputs)
                         loss = criterion(outputs, labels)
+                    # L1 regularization
+                    if l1_lambda > 0:
+                        l1_reg = torch.tensor(0.).to(device)
+                        for name, param in model.named_parameters():
+                            if 'bias' not in name:
+                                l1_reg += torch.norm(param, p=1)
+                        loss += l1_lambda * l1_reg
                     _, preds = torch.max(outputs, 1)
                     # backward + optimize only if in training phase
                     if phase == 'train':
@@ -488,33 +355,37 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs=25, is_ince
     return model, val_acc_history
 
 
-def run_finetune_model_torch(train_dir='datasets_iterative0',val_dir='datasets_anime',model_name="resnet",out_name="models/saved_model.pt"):
+def run_finetune_model_torch(train_dir='datasets_iterative0', val_dir='datasets_anime', model_name="resnet", feature_extract=False, l1_lambda=0.001, 
+                                out_name="models/saved_model.pth", batch_size=32, num_epochs=10, use_pretrained=True, learning_rate=.001):
+    '''
+    INPUTS
+    train_dir - 
+    val_dir - 
+    model_name - general model type to feed into initialize_model()
+    feature_extract - Flag for feature extracting. When False, we finetune the whole model. When True, we only update the reshaped layer params.
+    l1_lambda - for L1 regularization
+    out_name - saved name for model.state_dict()
+    batch_size - Batch size for training (change depending on how much memory you have)
+    num_epochs - Number of epochs to train for
+    use_pretrained - set to false if we want to laod in model without pretrained weights
+    '''
     # Models to choose from [resnet, alexnet, vgg, squeezenet, densenet, inception]
     # Number of classes in the dataset
     num_classes = len(os.listdir(train_dir))
-    # Batch size for training (change depending on how much memory you have)
-    batch_size = 8
-    # Number of epochs to train for
-    num_epochs = 15
-    # Flag for feature extracting. When False, we finetune the whole model,
-    #   when True we only update the reshaped layer params
-    feature_extract = True
     # Initialize the model for this run
-    model_ft, input_size = initialize_model(model_name, num_classes, feature_extract, use_pretrained=True)
-    # Print the model we just instantiated
-    print(model_ft)
+    model_ft, input_size, ft_transforms = initialize_model(model_name, num_classes, feature_extract, use_pretrained=use_pretrained)
     # Data augmentation and normalization for training
     # Just normalization for validation
     data_transforms = {
         'train': transforms.Compose([
-            transforms.RandomResizedCrop(input_size),
-            transforms.RandomHorizontalFlip(),
+            transforms.Resize(ft_transforms.keywords['resize_size']),
+            transforms.CenterCrop(ft_transforms.keywords['crop_size']),
             transforms.ToTensor(),
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ]),
         'val': transforms.Compose([
-            transforms.Resize(input_size),
-            transforms.CenterCrop(input_size),
+            transforms.Resize(ft_transforms.keywords['resize_size']),
+            transforms.CenterCrop(ft_transforms.keywords['crop_size']),
             transforms.ToTensor(),
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ]),
@@ -525,15 +396,6 @@ def run_finetune_model_torch(train_dir='datasets_iterative0',val_dir='datasets_a
                         'val': datasets.ImageFolder(val_dir, data_transforms['val'])}
     # Create training and validation dataloaders
     dataloaders_dict = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=batch_size, shuffle=True, num_workers=4) for x in ['train', 'val']}
-    # Detect if we have a GPU available
-    if torch.cuda.is_available():
-        device = torch.device("cuda")
-    else:
-        try:
-            import intel_extension_for_pytorch as ipex
-            device = 'xpu'
-        except: 
-            device = "cpu"
     # Send the model to GPU
     model_ft = model_ft.to(device)
     # Gather the parameters to be optimized/updated in this run. If we are
@@ -554,241 +416,41 @@ def run_finetune_model_torch(train_dir='datasets_iterative0',val_dir='datasets_a
             if param.requires_grad == True:
                 print("\t",name)
     # Observe that all parameters are being optimized
-    optimizer_ft = optim.SGD(params_to_update, lr=0.001, momentum=0.9)
+    optimizer_ft = optim.SGD(params_to_update, lr=learning_rate, momentum=0.9)
+    if device == 'xpu':
+        model_ft, optimizer_ft = ipex.optimize(model_ft,optimizer=optimizer_ft)
     # Setup the loss fxn
     criterion = nn.CrossEntropyLoss()
     # Train and evaluate
-    model_ft, hist = train_model(model_ft, dataloaders_dict, criterion, optimizer_ft, num_epochs=num_epochs, is_inception=(model_name=="inception"),device=device)
+    model_ft, hist = train_model(model_ft, dataloaders_dict, criterion, optimizer_ft, num_epochs=num_epochs, is_inception=(model_name=="inception"), l1_lambda=l1_lambda)
     torch.save(model_ft.state_dict(), out_name)
-    return model_ft
+    # return trained model and ordered classes
+    return model_ft, image_datasets['train'].classes
 
+
+def classify_single_image(image_path, class_names, model=None, model_path="models/saved_model.pt", imres=(96,96)):
+    if model is None:
+        model = torch.load(model_path)
+    model.to(device)
+    model.eval()
+    # Load and preprocess the image
+    transform = transforms.Compose([
+        transforms.Resize(imres),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])  # Standard normalization values
+    ])
+    image = Image.open(image_path)
+    image_tensor = transform(image).unsqueeze(0).to(device)  # Add batch dimension and move to device
+    # Perform inference
+    with torch.no_grad():
+        outputs = model(image_tensor)
+        score, predicted_idx = torch.max(outputs, 1)
+        predicted_label = class_names[predicted_idx.item()]
+    return predicted_label, score
 
 def get_image_scores_torch(model=None, model_path="models/saved_model.pt"):
     if model is None:
         model = torch.load(model_path)
-
-
-class OneShotDataset(Dataset):
-    def __init__(self, dataset, num_augmented_images, normalization_transform, augmentation_transform):
-        self.dataset = dataset
-        self.num_augmented_images = num_augmented_images
-        self.augmentation_transform = augmentation_transform
-        self.normalization_transform = normalization_transform
-
-    def __getitem__(self, index):
-        image, label = self.dataset[index]
-        augmented_images = []
-        augmented_labels = []
-        image_pil = transforms.ToPILImage()(image)  # Convert tensor to PIL Image
-        for _ in range(self.num_augmented_images):
-            augmented_image = self.augmentation_transform(image_pil)
-            augmented_images.append(self.normalization_transform(transforms.ToPILImage()(augmented_image)))
-            augmented_labels.append(label)
-        return self.normalization_transform(transforms.ToPILImage()(image)), torch.tensor(label), augmented_images, torch.tensor(augmented_labels)
-
-    def __len__(self):
-        return len(self.dataset)
-
-
-def run_face_recognition_1shot_torch(training_dir='datasets_training', validation_dir='datasets_anime', 
-                                      imres=(96, 96), num_augmented_images=100, out_name='models/saved_model.pt', 
-                                      reg=0.01, model=None, model_name='inception', feature_extract=False):
-    batch_size = 16
-    if torch.cuda.is_available():
-        device = torch.device("cuda")
-    else:
-        try:
-            import intel_extension_for_pytorch as ipex
-            device = 'xpu'
-        except: 
-            device = "cpu"
-
-    create_missing_classes(training_dir=training_dir, validation_dir=validation_dir)
-    
-    transform = transforms.Compose([
-        transforms.Resize(imres),
-        transforms.RandomRotation(40),
-        transforms.RandomHorizontalFlip(),
-        transforms.RandomResizedCrop(imres, scale=(0.8, 1.2)),
-        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    ])
-
-    training_set = ImageFolder(training_dir, transform=transform)
-    class_names = training_set.classes
-
-    training_set = OneShotDataset(training_set, num_augmented_images, transform, transform)
-    training_loader = DataLoader(training_set, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True)
-
-    validation_set = ImageFolder(validation_dir, transform=transforms.Compose([
-        transforms.Resize(imres),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    ]))
-    validation_loader = DataLoader(validation_set, batch_size=batch_size, shuffle=False, num_workers=4, pin_memory=True)
-
-    dataloaders_dict = {'train':training_loader, 'val':validation_loader}
-
-    if model is None:
-        # Initialize the model for this run
-        model, input_size = initialize_model(model_name, len(class_names), feature_extract, use_pretrained=True)
-        # Print the model we just instantiated
-        print(model)
-    model.to(device)
-    
-    params_to_update = model.parameters()
-    print("Params to learn:")
-    if feature_extract:
-        params_to_update = []
-        for name,param in model.named_parameters():
-            if param.requires_grad == True:
-                params_to_update.append(param)
-                print("\t",name)
-    else:
-        for name,param in model.named_parameters():
-            if param.requires_grad == True:
-                print("\t",name)
-
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(params_to_update, lr=0.001, momentum=0.9, weight_decay=reg)
-
-    if device == 'xpu':
-        model, optimizer = ipex.optimize(model, optimizer=optimizer)
-    
-    num_epochs = 10
-
-    # Train and evaluate
-    model, hist = train_model(model, dataloaders_dict, criterion, optimizer, device, num_epochs=num_epochs, is_inception=(model_name=="inception"))
-
-    model.load_state_dict(torch.load(out_name))
-    return model
-
-
-def train_face_recognition_1shot_torch(training_dir='datasets_training', validation_dir='datasets_anime', 
-                                      imres=(96, 96), num_augmented_images=100, out_name='models/saved_model.pt', 
-                                      reg=0.01, model=None):
-    batch_size = 16
-    if torch.cuda.is_available():
-        device = torch.device("cuda")
-    else:
-        try:
-            import intel_extension_for_pytorch as ipex
-            device = 'xpu'
-        except: 
-            device = "cpu"
-
-    create_missing_classes(training_dir=training_dir, validation_dir=validation_dir)
-    
-    transform = transforms.Compose([
-        transforms.Resize(imres),
-        transforms.RandomRotation(40),
-        transforms.RandomHorizontalFlip(),
-        transforms.RandomResizedCrop(imres, scale=(0.8, 1.2)),
-        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    ])
-
-    training_set = ImageFolder(training_dir, transform=transform)
-    class_names = training_set.classes
-
-    training_set = OneShotDataset(training_set, num_augmented_images, transform, transform)
-    training_loader = DataLoader(training_set, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True)
-
-    validation_set = ImageFolder(validation_dir, transform=transforms.Compose([
-        transforms.Resize(imres),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    ]))
-    validation_loader = DataLoader(validation_set, batch_size=batch_size, shuffle=False, num_workers=4, pin_memory=True)
-
-    if model is None:
-        model = models.inception_v3(pretrained=True)
-        num_ftrs = model.AuxLogits.fc.in_features
-        num_classes = len(class_names)
-        model.AuxLogits.fc = nn.Linear(num_ftrs, num_classes)
-        # Handle the primary net
-        num_ftrs = model.fc.in_features
-        model.fc = nn.Linear(num_ftrs,num_classes)
-    model.to(device)
-    
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9, weight_decay=reg)
-    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.2, patience=3, min_lr=0.00001)
-
-    if device == 'xpu':
-        model, optimizer = ipex.optimize(model, optimizer=optimizer)
-    
-    num_epochs = 10
-    best_val_loss = float('inf')
-    early_stop_counter = 0
-
-    for epoch in range(num_epochs):
-        # Training
-        model.train()
-        train_loss = 0.0
-
-        for images, labels, augmented_images, augmented_labels in training_loader:
-            images, labels = images.to(device), labels.to(device)
-            augmented_images = [img.to(device) for img in augmented_images]
-            augmented_labels = [lbl.to(device) for lbl in augmented_labels]
-
-            optimizer.zero_grad()
-            outputs = model(torch.cat([images] + augmented_images, dim=0))
-            labels = torch.cat([labels] + augmented_labels, dim=0)
-            loss = criterion(outputs, labels)
-            loss.backward()
-            optimizer.step()
-
-            train_loss += loss.item() * images.size(0)
-
-        train_loss /= len(training_loader.dataset)
-
-        # Validation
-        model.eval()
-        val_loss = 0.0
-        correct = 0
-        total = 0
-
-        with torch.no_grad():
-            for images, labels in validation_loader:
-                images, labels = images.to(device), labels.to(device)
-
-                outputs = model(images)
-                loss = criterion(outputs, labels)
-                val_loss += loss.item() * images.size(0)
-
-                _, predicted = torch.max(outputs.data, 1)
-                total += labels.size(0)
-                correct += (predicted == labels).sum().item()
-
-        val_loss /= len(validation_loader.dataset)
-        val_acc = correct / total
-
-        scheduler.step(val_loss)
-
-        print(f'Epoch [{epoch+1}/{num_epochs}] - Train Loss: {train_loss:.4f} - Val Loss: {val_loss:.4f} - Val Acc: {val_acc:.4f}')
-
-        # Early stopping based on validation loss
-        if epoch > 4 and val_loss < best_val_loss:
-            early_stop_counter += 1
-            if early_stop_counter >= 3:
-                print('Early stopping triggered. Training stopped.')
-                break
-        else:
-            early_stop_counter = 0
-            best_val_loss = val_loss
-            torch.save(model.state_dict(), out_name)
-
-    model.load_state_dict(torch.load(out_name))
-    return model
-
-
-def load_existing_model(model_name='models/saved_model.h5'):
-    model = tf.keras.models.load_model(model_name,
-       custom_objects={'KerasLayer':hub.KerasLayer})
-    return model
 
 
 def get_img_scores_tf(img_name, imres=(96,96), model=None):
@@ -945,9 +607,32 @@ if __name__ == "__main__":
     # model = load_existing_model()
     # augment_images('datasets_iterative0/Kenzou_Tenma','augmented_images',150)
     # classify_all_characters_tf('datasets_anime','datasets_iterative1',model_name='models/FRmodel2.h5',ac_min=.15,ac_max=.2)
-    augment_dataset('datasetsTOMON','datasetsTOMON',4000,tvsplit=.1)
+    # augment_dataset('datasetsTOMON','datasetsTOMON',5000,tvsplit=.1,imres=(256,256),copy_base=True)
     # train_val_split('datasetsTOMON/')
-    # run_finetune_model_torch(train_dir='datasetsTOMON/train',val_dir='datasetsTOMON/val',model_name="resnet101",out_name="models/image_model.pt")
+    model_name = "efficientnetv2S"
+    feature_extract=True
+    model_ft, classnames = run_finetune_model_torch(train_dir='datasetsTOMON/train',val_dir='datasetsTOMON/val',model_name=model_name,l1_lambda=.00001, 
+                                                    batch_size=16, out_name="models/image_model.pth",feature_extract=feature_extract,use_pretrained=False,
+                                                    learning_rate=.004,num_epochs=20)
+    # classnames = ['faces', 'manga', 'not_anime', 'objects', 'other_anime']
+    _, input_size = initialize_model(model_name, len(classnames), feature_extract, use_pretrained=True)
+    image_path = "datasetsTOMON/faces/Ep62hh00mm03ss03ms933-square0.png"
+    predicted_label, score = classify_single_image(image_path,classnames,model=model_ft,model_path="models/image_model.pt",
+                                                    imres=(input_size,input_size))
+    print(f"Predicted Label for {image_path}: {predicted_label} with score {score}.")
     # run_finetune_model_torch(train_dir='datasets_augmented1tv/train',val_dir='datasets_augmented1tv/val',model_name="resnet",out_name="models/FRmodel1.pt")
     # model = train_face_recognition_1shot_torch(training_dir='datasets_iterative0',validation_dir='datasets_anime',imres=(96,96),num_augmented_images=150,out_name='models/one_shot.pt')
 
+'''
+resnet50
+Epoch 9/9
+----------
+train - Loss: 27.603197657214416, Acc: 26108/28397
+val - Loss: 27.57435869542977, Acc: 2927/3153
+
+resnet152
+Epoch 9/9
+----------
+train - Loss: 46.162073462279025, Acc: 26263/28397
+val - Loss: 46.13337387631819, Acc: 2944/3153
+'''

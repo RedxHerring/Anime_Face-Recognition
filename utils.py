@@ -697,8 +697,9 @@ def get_not_this_anime(anime_file, dataset_top='datasetsTOMON', imres=(96,96)):
     shutil.rmtree("Images/other_anime-original")
     
     # Get dataset of manga images for the anime.
-    search_query = f"{anime_name} manga characters"
-    parallel_worker_threads(search_keys=search_query,token_names="manga_characters",imgs_path="Images/manga-original",num_images=1000,
+    main_characters = list(df.Name[df.Character_Type=="Main "])
+    search_queries = [f"{a} {anime_name} manga" for a in main_characters]
+    parallel_worker_threads(search_keys=search_queries,token_names=main_characters,imgs_path="Images/manga-original",num_images=1000,
                             maxmissed=1000,reject_strs=reject_strs,simthresh=.3)
     out_data_dir = os.path.join(dataset_top,"manga")
     remove_colored_images("Images/manga-original") # keep only black-and-white downloaded images
@@ -747,7 +748,7 @@ if __name__ == '__main__':
     # filter_google_images()
     # create_unlabeled_set()
     # get_not_this_anime_("Monster-Characters.csv")
-    # get_not_this_anime('Monster-Characters.csv',imres=(256,256))
+    get_not_this_anime('Monster-Characters.csv',imres=(256,256))
     # crop_video_frames('Monster.S01.480p.NF.WEB-DL.DDP2.0.x264-Emmid',skip_frames=400,save_rect=False,save_square=True,imres=(256,256))
     crop_objects("Images/google-images-noface/Johan_Liebert/_Monster_307.jpeg", imres=(299,299))
 
